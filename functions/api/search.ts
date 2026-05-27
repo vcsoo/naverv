@@ -1,4 +1,4 @@
-import { collectAndStore, findPlaceInLatest, getPlaceHistory, upsertTarget, type Env } from '../../src/shared/db'
+import { ensureRanking, findPlaceInLatest, getPlaceHistory, upsertTarget, type Env } from '../../src/shared/db'
 
 export async function onRequestPost(context: { request: Request; env: Env }) {
   try {
@@ -7,11 +7,8 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     const placeName = String(body.place_name || body.place || '').trim()
     if (!query || !placeName) return Response.json({ error: 'search_query and place_name are required' }, { status: 400 })
 
-    let found = await findPlaceInLatest(context.env.DB, query, placeName)
-    if (!found) {
-      await collectAndStore(context.env.DB, query, 75)
-      found = await findPlaceInLatest(context.env.DB, query, placeName)
-    }
+    await ensureRanking(context.env.DB, query, 75)
+    const found = await findPlaceInLatest(context.env.DB, query, placeName)
 
     if (!found || !found.matched) {
       await upsertTarget(context.env.DB, query, placeName, null)
