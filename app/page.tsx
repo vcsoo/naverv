@@ -153,4 +153,144 @@ export default function Home() {
         .rl-r.t1{color:var(--gold)}.rl-r.t3{color:var(--org)}.rl-r.t10{color:var(--gd)}
         .rl-n{font-weight:600}.rl-c{font-size:.72rem;color:var(--sub);margin-top:1px}
         .rl-adr{font-size:.73rem;color:var(--sub);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .btn-trk{padding:3px 9px;border:1.5px solid var(--g);color:var(--gd);background:#fff;border-radius:6px;font-size:.7rem;font-weight:600;cursor:poin
+        .btn-trk{padding:3px 9px;border:1.5px solid var(--g);color:var(--gd);background:#fff;border-radius:6px;font-size:.7rem;font-weight:600;cursor:pointer}
+        .tcard{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 8px rgba(0,0,0,.07);overflow:hidden;margin-bottom:22px}
+        .tcard-hdr{padding:14px 20px;border-bottom:1px solid var(--bdr);background:#fafbfc;display:flex;align-items:center;justify-content:space-between}
+        .tcard-hdr h3{font-size:.88rem;font-weight:700}
+        .trow{display:flex;align-items:center;padding:11px 18px;border-bottom:1px solid #f4f7fb;gap:10px;cursor:pointer}
+        .trow:hover{background:#f8fbff}.t-info{flex:1}.t-q{font-size:.82rem;font-weight:600}.t-p{font-size:.75rem;color:var(--mut);margin-top:1px}
+        .t-rank{font-family:monospace;font-size:1rem;font-weight:700;min-width:46px;text-align:center}
+        .t-rank.t1{color:var(--gold)}.t-rank.t3{color:var(--org)}.t-rank.t10{color:var(--gd)}
+        .t-days{font-size:.7rem;color:var(--sub);background:#f4f7fb;padding:2px 7px;border-radius:10px}
+        .t-del{padding:3px 8px;border:1.5px solid var(--bdr);color:var(--sub);background:#fff;border-radius:5px;font-size:.7rem;cursor:pointer}
+        .t-del:hover{border-color:var(--red);color:var(--red)}
+        .empty{text-align:center;padding:36px;color:var(--sub)}
+        .nf{background:#fff8f8;border:1.5px solid #ffcdd2;border-radius:9px;padding:16px 18px;color:#c62828;font-size:.85rem;margin:0;border-radius:0 0 var(--r) var(--r)}
+        .overlay{display:flex;position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+        .spin{width:46px;height:46px;border:4px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .7s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .smsg{color:var(--mut);font-size:.86rem;text-align:center}
+        .btn-sm{padding:5px 11px;border:1.5px solid var(--bdr);background:#fff;border-radius:7px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--mut)}
+        @media(max-width:680px){.srow{grid-template-columns:1fr;gap:8px}}
+      `}</style>
+
+      {loading && <div className="overlay"><div className="spin"/><div className="smsg">{loadingMsg}</div></div>}
+
+      <header className="hdr">
+        <div>
+          <h1>🏆 네이버 플레이스 순위 추적기</h1>
+          <p>매일 11:00 자동수집 · 100위 · 30일 추적</p>
+        </div>
+      </header>
+
+      <div className="wrap">
+        <div className="scard">
+          <h2>🔍 순위 확인</h2>
+          <div className="srow">
+            <div className="fg"><label>검색어 (키워드)</label>
+              <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="예) 검단신도시미용실" onKeyDown={e=>e.key==='Enter'&&doSearch()}/>
+            </div>
+            <div className="fg"><label>상호명 <span style={{fontSize:'.65rem',color:'var(--sub)',fontWeight:400}}>※ 비워두면 전체 100위 목록</span></label>
+              <input value={place} onChange={e=>setPlace(e.target.value)} placeholder="예) 르아헤어 (선택사항)" onKeyDown={e=>e.key==='Enter'&&doSearch()}/>
+            </div>
+            <button className="btn-main" onClick={()=>doSearch()} disabled={loading}>
+              {place.trim()?'순위 확인 →':'전체 순위 보기 →'}
+            </button>
+          </div>
+          <div className="hint">
+            <span className="mtag mta">🏷 상호명 입력 시</span> 날짜별 순위 추적 (▲빨강=상승 / ▼파랑=하락)
+            &nbsp;|&nbsp;
+            <span className="mtag mtb">📋 키워드만</span> 상위 100위 전체 목록
+          </div>
+        </div>
+
+        {result && (
+          <div className="result-wrap">
+            <div className="res-hdr">
+              <div>
+                <div className="bname">{result.not_found ? curP : result.matched_name}</div>
+                <div className="qname">검색어: {curQ}</div>
+                {!result.not_found && (
+                  <div className="cur-row">
+                    <span className={`rnum ${tCls(result.rank)}`}>{result.rank}</span>
+                    <span style={{color:'rgba(255,255,255,.55)',fontSize:'.9rem'}}>위</span>
+                    <span className={`cbadge ${result.prev_rank==null?'cnw':result.prev_rank===result.rank?'csm':result.prev_rank>result.rank?'cdn':'cup'}`}>
+                      {result.prev_rank==null?'NEW':result.prev_rank===result.rank?'━ 유지':result.prev_rank>result.rank?`▲${result.prev_rank-result.rank} 상승`:`▼${result.rank-result.prev_rank} 하락`}
+                    </span>
+                    <span style={{color:'rgba(255,255,255,.4)',fontSize:'.7rem'}}>수집: {result.collected_at?.slice(0,16)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {result.not_found
+              ? <div className="nf"><b>"{curP}"</b>을(를) <b>"{curQ}"</b> 검색결과 <b>{result.total_collected}위</b> 내에서 찾을 수 없습니다.</div>
+              : buildTable(result.history||[])}
+          </div>
+        )}
+
+        {rankList && (
+          <div className="ranking-wrap">
+            <div className="res-hdr">
+              <div>
+                <div className="bname">"{rankMeta?.query}" 상위 100위</div>
+                <div className="qname">수집: {rankMeta?.collected_at?.slice(0,16)} · {rankList.length}개</div>
+              </div>
+            </div>
+            <div className="rlt">
+              <table>
+                <thead><tr>
+                  <th style={{width:46,textAlign:'center'}}>순위</th><th>상호명</th>
+                  <th style={{width:90}}>카테고리</th><th style={{width:80,textAlign:'right'}}>블로그</th>
+                  <th style={{width:80,textAlign:'right'}}>방문자</th><th style={{width:75,textAlign:'right'}}>총리뷰</th>
+                  <th>주소</th><th style={{width:58,textAlign:'center'}}>추적</th>
+                </tr></thead>
+                <tbody>
+                  {rankList.map(r => (
+                    <tr key={r.rank}>
+                      <td className={`rl-r ${tCls(r.rank)}`}>{r.rank}</td>
+                      <td><div className="rl-n">{r.place_name}</div><div className="rl-c">{r.category||''}</div></td>
+                      <td style={{fontSize:'.74rem',color:'var(--sub)'}}>{r.category||'—'}</td>
+                      <td style={{fontFamily:'monospace',fontSize:'.8rem',color:'var(--gd)',textAlign:'right'}}>{(r.blog||0).toLocaleString()}</td>
+                      <td style={{fontFamily:'monospace',fontSize:'.8rem',color:'var(--blue)',textAlign:'right'}}>{(r.visit||0).toLocaleString()}</td>
+                      <td style={{fontFamily:'monospace',fontSize:'.8rem',fontWeight:600,textAlign:'right'}}>{(r.total||0).toLocaleString()}</td>
+                      <td className="rl-adr">{r.address||'—'}</td>
+                      <td style={{textAlign:'center'}}>
+                        <button className="btn-trk" onClick={()=>{setQuery(rankMeta?.query||'');setPlace(r.place_name);setTimeout(()=>doSearch(),100)}}>+추적</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <div className="tcard">
+          <div className="tcard-hdr">
+            <h3>📌 추적 중인 목록 <span style={{fontSize:'.7rem',color:'var(--sub)',fontWeight:400,marginLeft:4}}>(매일 오전 11:00 자동수집)</span></h3>
+            <button className="btn-sm" onClick={loadTargets}>↻ 새로고침</button>
+          </div>
+          {targets.length===0
+            ? <div className="empty">📭 추적 중인 항목이 없습니다.<br/><small>검색어 + 상호명 입력 후 순위 확인을 누르면 자동 등록됩니다.</small></div>
+            : targets.map(t => {
+              const nm = t.matched_name||t.place_name_input
+              return (
+                <div key={`${t.search_query}-${t.place_name_input}`} className="trow"
+                  onClick={()=>{setQuery(t.search_query);setPlace(t.place_name_input);setTimeout(()=>doSearch(),100)}}>
+                  <div className="t-info"><div className="t-q">{t.search_query}</div><div className="t-p">{nm}</div></div>
+                  <div className={`t-rank ${tCls(t.latest_rank||0)}`}>{t.latest_rank?`${t.latest_rank}위`:'—'}</div>
+                  <span className="t-days">D-{t.days_left}</span>
+                  <button className="t-del" onClick={async e=>{
+                    e.stopPropagation()
+                    if(!confirm(`"${nm}" 추적 중단?`))return
+                    await fetch(`/api/targets?query=${encodeURIComponent(t.search_query)}&place=${encodeURIComponent(t.place_name_input)}`,{method:'DELETE'})
+                    loadTargets()
+                  }}>✕</button>
+                </div>
+              )
+            })}
+        </div>
+      </div>
+    </>
+  )
+}
