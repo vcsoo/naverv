@@ -1,0 +1,13 @@
+name = "naverv-daily-collector"
+main = "src/index.ts"
+compatibility_date = "2026-05-27"
+
+# 02:30 UTC = 11:30 KST
+[triggers]
+crons = ["30 2 * * *"]
+
+# Fill database_id before deploying with wrangler, or bind DB manually in the Cloudflare dashboard.
+[[d1_databases]]
+binding = "DB"
+database_name = "naverv-db"
+database_id = "REPLACE_WITH_NAVERV_DB_DATABASE_ID"
