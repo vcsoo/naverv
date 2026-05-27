@@ -17,7 +17,7 @@ import requests
 
 # ── ★ 설정 (여기만 수정) ────────────────────────
 CLOUD_URL  = "https://naverv.pages.dev"   # Cloudflare Pages URL
-API_SECRET = "여기에_비밀키_입력"           # Cloudflare Pages 환경변수와 동일하게
+API_SECRET = "tnsgml2199"           # Cloudflare Pages 환경변수와 동일하게
 QUERIES    = ["검단신도시미용실"]            # 수집할 검색어 목록
 MAX_ITEMS  = 100
 HEADLESS   = True   # False 로 바꾸면 브라우저 창이 보임
