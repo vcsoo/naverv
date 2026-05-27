@@ -1,4 +1,4 @@
-import { collectAndStore, getLatestRankingList, type Env } from '../../src/shared/db'
+import { ensureRanking, getLatestRankingList, type Env } from '../../src/shared/db'
 
 export async function onRequestPost(context: { request: Request; env: Env }) {
   try {
@@ -7,12 +7,9 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
     const limit = Number(body.limit || 100)
     if (!query) return Response.json({ error: 'search_query is required' }, { status: 400 })
 
-    let ranking = await getLatestRankingList(context.env.DB, query, limit)
-    if (!ranking) {
-      const run = await collectAndStore(context.env.DB, query, Math.min(limit || 75, 75))
-      ranking = await getLatestRankingList(context.env.DB, query, limit)
-      if (!ranking) return Response.json({ need_collect: true, collected_at: run.collected_at })
-    }
+    await ensureRanking(context.env.DB, query, Math.min(limit || 75, 75))
+    const ranking = await getLatestRankingList(context.env.DB, query, limit)
+    if (!ranking) return Response.json({ need_collect: true })
 
     return Response.json(ranking)
   } catch (e: any) {
