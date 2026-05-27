@@ -1,0 +1,9 @@
+name = "naverv"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "naverv-db"
+database_id = "c3a124bf-f795-4d6a-b8b9-a03db460591d"
