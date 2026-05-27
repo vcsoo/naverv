@@ -36,3 +36,31 @@ export async function GET() {
       return {
         search_query: t.search_query,
         place_name_input: t.place_name_input,
+        matched_name: t.matched_name,
+        latest_rank,
+        last_searched_at: t.last_searched_at.slice(0, 10),
+        days_left
+      }
+    }))
+
+    return Response.json(output)
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { env } = getRequestContext()
+    const db = (env as any).DB
+    const { searchParams } = new URL(request.url)
+
+    await db.prepare(
+      'DELETE FROM targets WHERE search_query = ? AND place_name_input = ?'
+    ).bind(searchParams.get('query') || '', searchParams.get('place') || '').run()
+
+    return Response.json({ ok: true })
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 })
+  }
+}
