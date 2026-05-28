@@ -36,8 +36,11 @@ export default function Home() {
   const [rows, setRows] = useState<Row[]>([])
   const [dates, setDates] = useState<string[]>([])
   const [dayFilter, setDayFilter] = useState<7 | 14 | 30>(7)
+  const [cardDate, setCardDate] = useState<string>('')
   const [registering, setRegistering] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
 
   useEffect(() => { loadDashboard() }, [])
   useEffect(() => { if (window.innerWidth < 700) setViewMode('card') }, [])
@@ -45,7 +48,6 @@ export default function Home() {
   const mkKey = (sq: string, pi: string) => `${sq}||${pi}`
   const rCls  = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
   const tCls  = (r: number) => r === 1 ? 't1' : r <= 3 ? 't3' : r <= 10 ? 't10' : ''
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
 
   // ── 공통 변동 표시 ────────────────────────────────────────
   const chgSpan = (diff: number | null, isNew?: boolean): React.ReactNode => {
@@ -59,7 +61,10 @@ export default function Home() {
   function calcDates(rowList: Row[]) {
     const s = new Set<string>()
     for (const r of rowList) for (const h of r.history) s.add(h.date)
-    setDates([...s].sort().reverse())
+    const sorted = [...s].sort().reverse()
+    setDates(sorted)
+    // cardDate를 최신 날짜로 초기화 (아직 없을 때만)
+    setCardDate(prev => prev || sorted[0] || today)
   }
 
   async function fetchHistory(query: string, place: string) {
@@ -194,16 +199,17 @@ export default function Home() {
     )
   }
 
-  // ── 카드 뷰: 업체 카드 렌더링 ────────────────────────────
-  function renderCard(row: Row) {
+  // ── 카드 뷰: 선택 날짜 기준 렌더링 ──────────────────────
+  function renderCard(row: Row, selDate: string) {
     const sorted = [...row.history].sort((a, b) => a.date < b.date ? -1 : 1)
-    const last  = sorted[sorted.length - 1]
-    const prev  = sorted[sorted.length - 2]
-    const last7 = sorted.slice(-7)
+    const idx    = sorted.findIndex(x => x.date === selDate)
+    const h      = idx >= 0 ? sorted[idx] : null
+    const prev   = idx > 0 ? sorted[idx - 1] : null
+    const last7  = sorted.slice(-7)
 
-    const rankDiff  = (last && prev) ? prev.rank  - last.rank  : null
-    const blogDiff  = (last && prev) ? last.blog  - prev.blog  : null
-    const visitDiff = (last && prev) ? last.visit - prev.visit : null
+    const rankDiff  = (h && prev) ? prev.rank  - h.rank  : null
+    const blogDiff  = (h && prev) ? h.blog  - prev.blog  : null
+    const visitDiff = (h && prev) ? h.visit - prev.visit : null
 
     return (
       <div key={row.key} className="crd">
@@ -217,42 +223,45 @@ export default function Home() {
           </div>
         </div>
 
-        {last && (
+        {h ? (
           <>
-            {/* 오늘 핵심 수치 */}
+            {/* 선택 날짜 핵심 수치 */}
             <div className="crd-main">
               <div className="crd-rk-wrap">
-                <span className={`crd-rank ${tCls(last.rank)}`}>{last.rank}위</span>
+                <span className={`crd-rank ${tCls(h.rank)}`}>{h.rank}위</span>
                 {chgSpan(rankDiff, !prev)}
               </div>
               <div className="crd-counts">
                 <div className="crd-cnt">
                   <span className="crd-lbl">블</span>
-                  <span className="crd-val blog">{last.blog.toLocaleString()}</span>
+                  <span className="crd-val blog">{h.blog.toLocaleString()}</span>
                   {chgSpan(blogDiff)}
                 </div>
                 <div className="crd-cnt">
                   <span className="crd-lbl">방</span>
-                  <span className="crd-val visit">{last.visit.toLocaleString()}</span>
+                  <span className="crd-val visit">{h.visit.toLocaleString()}</span>
                   {chgSpan(visitDiff)}
                 </div>
               </div>
             </div>
 
-            {/* 최근 7일 미니 순위 */}
+            {/* 최근 7일 미니 순위 (선택 날짜 하이라이트) */}
             {last7.length > 1 && (
               <div className="crd-hist">
-                {last7.map((h, i) => {
-                  const dt = new Date(h.date + 'T00:00:00')
+                {last7.map((hh, i) => {
+                  const dt = new Date(hh.date + 'T00:00:00')
                   const mm = String(dt.getMonth() + 1).padStart(2, '0')
                   const dd = String(dt.getDate()).padStart(2, '0')
                   const prevH = i > 0 ? last7[i - 1] : null
-                  const rd = prevH ? prevH.rank - h.rank : null
-                  const isToday = h.date === today
+                  const rd = prevH ? prevH.rank - hh.rank : null
+                  const isSel = hh.date === selDate
                   return (
-                    <div key={h.date} className={`crd-day${isToday ? ' crd-today' : ''}`}>
-                      <div className="crd-day-lbl">{isToday ? '오늘' : `${mm}.${dd}`}</div>
-                      <div className={`mob-rv ${rCls(h.rank)}`}>{h.rank}</div>
+                    <div key={hh.date}
+                      className={`crd-day${isSel ? ' crd-sel' : ''}`}
+                      onClick={() => setCardDate(hh.date)}
+                      style={{ cursor: 'pointer' }}>
+                      <div className="crd-day-lbl">{hh.date === today ? '오늘' : `${mm}.${dd}`}</div>
+                      <div className={`mob-rv ${rCls(hh.rank)}`}>{hh.rank}</div>
                       <div className={`mob-chg ${rd === null ? 'rc-nw' : rd > 0 ? 'rc-up' : rd < 0 ? 'rc-dn' : 'rc-sm'}`}>
                         {rd === null ? 'N' : rd > 0 ? `▲${rd}` : rd < 0 ? `▼${Math.abs(rd)}` : '━'}
                       </div>
@@ -262,9 +271,18 @@ export default function Home() {
               </div>
             )}
           </>
+        ) : (
+          <div className="crd-nodata">선택 날짜 데이터 없음</div>
         )}
       </div>
     )
+  }
+
+  // ── 날짜 포맷 헬퍼 ───────────────────────────────────────
+  function fmtDate(d: string) {
+    if (d === today) return '오늘'
+    const dt = new Date(d + 'T00:00:00')
+    return `${String(dt.getMonth() + 1).padStart(2, '0')}.${String(dt.getDate()).padStart(2, '0')}`
   }
 
   // ── Render ─────────────────────────────────────────────────
@@ -343,38 +361,46 @@ export default function Home() {
         .empty{padding:46px;text-align:center;color:var(--sub)}
         .empty p{font-size:.82rem;margin-top:8px;line-height:1.7}
 
+        /* 카드 뷰 날짜 탭 바 */
+        .dash-date-bar{display:flex;gap:5px;padding:8px 14px;overflow-x:auto;border-bottom:1px solid var(--bdr);background:#f7faf7;-webkit-overflow-scrolling:touch}
+        .dash-date-bar::-webkit-scrollbar{height:3px}
+        .dash-date-bar::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+        .date-tab{padding:4px 11px;border:1.5px solid var(--bdr);background:#fff;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--mut);white-space:nowrap;flex-shrink:0;transition:.12s}
+        .date-tab.on{background:var(--g);color:#fff;border-color:var(--g)}
+        .date-tab:not(.on):hover{border-color:var(--g);color:var(--gd)}
+
         /* ── 표 뷰 ── */
-        .dtw{overflow-x:auto}
+        .dtw{overflow-x:auto;-webkit-overflow-scrolling:touch}
         .dt{border-collapse:collapse;width:max-content;min-width:100%}
         .dt thead th,.dt tbody td{white-space:nowrap}
         .grp-row td{background:linear-gradient(to right,#f0fff8,#f8fbff);padding:7px 16px;font-size:.76rem;font-weight:700;color:var(--gd);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12)}
         .grp-cnt{font-size:.67rem;color:var(--sub);font-weight:400;margin-left:4px}
-        .rl-hdr{position:sticky;left:0;z-index:20;background:#f7fafc;padding:9px 14px;text-align:left;border-right:2px solid var(--bdr);border-bottom:2px solid var(--bdr);font-size:.67rem;font-weight:600;color:var(--mut);text-transform:uppercase;width:170px;min-width:170px}
-        .rl-cell{position:sticky;left:0;z-index:10;background:#fff;padding:7px 12px;border-right:2px solid var(--bdr);border-bottom:1px solid #f0f4f8;width:170px;min-width:170px}
+        .rl-hdr{position:sticky;left:0;z-index:20;background:#f7fafc;padding:9px 14px;text-align:left;border-right:2px solid var(--bdr);border-bottom:2px solid var(--bdr);font-size:.67rem;font-weight:600;color:var(--mut);text-transform:uppercase;width:140px;min-width:140px}
+        .rl-cell{position:sticky;left:0;z-index:10;background:#fff;padding:7px 10px;border-right:2px solid var(--bdr);border-bottom:1px solid #f0f4f8;width:140px;min-width:140px}
         .rl-cell:hover{background:#f8fffb}
-        .rl-inner{display:flex;align-items:center;gap:6px}
-        .rl-name{font-size:.81rem;font-weight:600;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis}
+        .rl-inner{display:flex;align-items:center;gap:4px}
+        .rl-name{font-size:.78rem;font-weight:600;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis}
         .rl-acts{display:flex;align-items:center;gap:4px;flex-shrink:0}
         .rl-err{font-size:.62rem;color:var(--red)}
         .spin-sm{width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block}
         .btn-del{padding:2px 6px;border:1.5px solid #e2e8f0;color:var(--sub);background:#fff;border-radius:4px;font-size:.64rem;cursor:pointer}
         .btn-del:hover{border-color:var(--red);color:var(--red)}
-        .dhdr{padding:7px 2px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;width:96px;min-width:96px;text-align:center}
-        .dh-d{font-family:monospace;font-size:.7rem;font-weight:700;color:var(--txt)}
-        .dh-w{font-size:.58rem;color:var(--sub);margin-top:1px}
+        .dhdr{padding:6px 2px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;width:80px;min-width:80px;text-align:center}
+        .dh-d{font-family:monospace;font-size:.68rem;font-weight:700;color:var(--txt)}
+        .dh-w{font-size:.56rem;color:var(--sub);margin-top:1px}
         .dhdr.today{background:#f0fff8}.dhdr.today .dh-d{color:var(--gd)}
         .dhdr.sun .dh-d{color:var(--red)}.dhdr.sat .dh-d{color:var(--blue)}
-        .dc{padding:6px 4px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;width:96px;min-width:96px;vertical-align:top}
+        .dc{padding:5px 2px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;width:80px;min-width:80px;vertical-align:top}
         .dc-nil{color:#cbd5e1;font-size:.76rem;vertical-align:middle!important}
-        .dc-rk{display:flex;flex-direction:column;align-items:center;margin-bottom:4px}
+        .dc-rk{display:flex;flex-direction:column;align-items:center;margin-bottom:3px}
         .dc-stat{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:2px;line-height:1.2}
-        .dc-lbl{color:var(--sub);font-weight:700;font-size:.58rem;flex-shrink:0}
-        .dc-num{font-family:monospace;font-weight:600;font-size:.62rem}
+        .dc-lbl{color:var(--sub);font-weight:700;font-size:.56rem;flex-shrink:0}
+        .dc-num{font-family:monospace;font-weight:600;font-size:.6rem}
         .dc-num.blog{color:var(--gd)}.dc-num.visit{color:var(--blue)}
-        .rv{font-family:monospace;font-size:.78rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;margin:0 auto}
+        .rv{font-family:monospace;font-size:.72rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;margin:0 auto}
         .rv.r1{background:var(--gold);color:#5a3800}.rv.r3{background:var(--org);color:#fff}
         .rv.r10{background:var(--gb);color:var(--gd)}.rv.rn{background:#f0f4f8;color:var(--txt)}
-        .rc{font-size:.6rem;font-weight:700;display:block;margin-top:2px}
+        .rc{font-size:.58rem;font-weight:700;display:block;margin-top:2px}
         .rc-up{color:var(--red)}.rc-dn{color:var(--blue)}.rc-sm{color:var(--sub)}.rc-nw{color:var(--g)}
 
         /* ── 카드 뷰 ── */
@@ -395,17 +421,37 @@ export default function Home() {
         .crd-val{font-family:monospace;font-weight:600}
         .crd-val.blog{color:var(--gd)}.crd-val.visit{color:var(--blue)}
         .crd-hist{display:flex;gap:6px;padding-top:8px;border-top:1px solid #f0f4f8;overflow-x:auto}
-        .crd-day{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
-        .crd-day.crd-today .crd-day-lbl{color:var(--gd);font-weight:700}
-        .crd-day.crd-today .mob-rv{outline:2px solid var(--g);outline-offset:1px}
+        .crd-day{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;padding:3px 4px;border-radius:6px;transition:.12s}
+        .crd-day:hover{background:rgba(3,199,90,.08)}
+        .crd-day.crd-sel .crd-day-lbl{color:var(--gd);font-weight:700}
+        .crd-day.crd-sel .mob-rv{outline:2px solid var(--g);outline-offset:1px}
         .crd-day-lbl{font-size:.58rem;color:var(--sub);font-family:monospace}
         .mob-rv{font-family:monospace;font-size:.72rem;font-weight:700;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center}
         .mob-rv.r1{background:var(--gold);color:#5a3800}.mob-rv.r3{background:var(--org);color:#fff}
         .mob-rv.r10{background:var(--gb);color:var(--gd)}.mob-rv.rn{background:#f0f4f8;color:var(--txt)}
         .mob-chg{font-size:.58rem;font-weight:700}
+        .crd-nodata{font-size:.76rem;color:var(--sub);text-align:center;padding:10px 0}
 
         @keyframes spin{to{transform:rotate(360deg)}}
-        @media(max-width:640px){.srow{grid-template-columns:1fr}}
+
+        /* 모바일 반응형 */
+        @media(max-width:640px){
+          .srow{grid-template-columns:1fr}
+          .wrap{padding:12px 10px;gap:12px}
+          .card{padding:14px 14px}
+          /* 표 뷰: 업체명 컬럼 + 날짜 컬럼 축소 */
+          .rl-hdr{width:100px;min-width:100px;padding:7px 8px;font-size:.6rem}
+          .rl-cell{width:100px;min-width:100px;padding:6px 6px}
+          .rl-name{font-size:.7rem}
+          .dhdr{width:62px;min-width:62px;padding:5px 1px}
+          .dh-d{font-size:.6rem}
+          .dh-w{font-size:.5rem}
+          .dc{width:62px;min-width:62px;padding:4px 1px}
+          .rv{width:24px;height:24px;font-size:.64rem}
+          .dc-num{font-size:.55rem}
+          .dc-lbl{font-size:.5rem}
+          .rc{font-size:.52rem}
+        }
       `}</style>
 
       <header className="hdr">
@@ -557,6 +603,19 @@ export default function Home() {
             </div>
           </div>
 
+          {/* 카드 뷰: 날짜 선택 바 */}
+          {viewMode === 'card' && dates.length > 0 && (
+            <div className="dash-date-bar">
+              {dates.slice(0, 14).map(d => (
+                <button key={d}
+                  className={`date-tab${cardDate === d ? ' on' : ''}`}
+                  onClick={() => setCardDate(d)}>
+                  {fmtDate(d)}
+                </button>
+              ))}
+            </div>
+          )}
+
           {rows.length === 0 ? (
             <div className="empty">
               <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>📋</div>
@@ -568,7 +627,7 @@ export default function Home() {
               {groups.map(([query, groupRows]) => (
                 <div key={query}>
                   <div className="crd-group-hdr">🔑 {query}</div>
-                  {groupRows.map(row => renderCard(row))}
+                  {groupRows.map(row => renderCard(row, cardDate))}
                 </div>
               ))}
             </div>
