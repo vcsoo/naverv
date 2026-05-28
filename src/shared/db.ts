@@ -154,29 +154,10 @@ export async function listActiveTargets(db: D1Database) {
     .prepare(
       `SELECT id, search_query, place_name_input, matched_name, first_added_at, last_searched_at
        FROM targets
-       WHERE datetime(first_added_at, '+30 days') >= datetime(?)
        ORDER BY last_searched_at DESC`,
     )
-    .bind(kstNowString().replace('T', ' '))
     .all<any>()
-
-  const out = []
-  const today = new Date(`${kstDateString()}T00:00:00+09:00`).getTime()
-  for (const t of results) {
-    const name = t.matched_name || t.place_name_input
-    const latest = await db
-      .prepare(
-        `SELECT rank FROM rankings
-         WHERE search_query = ? AND (place_name = ? OR place_name = ?)
-         ORDER BY collected_at DESC LIMIT 1`,
-      )
-      .bind(t.search_query, name, t.place_name_input)
-      .first<{ rank: number }>()
-    const first = new Date(`${String(t.first_added_at).slice(0, 10)}T00:00:00+09:00`).getTime()
-    const daysLeft = Math.max(0, 30 - Math.floor((today - first) / 86400000))
-    out.push({ ...t, latest_rank: latest?.rank || null, days_left: daysLeft })
-  }
-  return out
+  return results
 }
 
 export async function collectActiveTargets(db: D1Database) {
