@@ -86,7 +86,7 @@ function findItemBlocks(value: unknown): any[] {
     for (const item of value) found.push(...findItemBlocks(item))
   } else if (value && typeof value === 'object') {
     const obj = value as any
-    if (Array.isArray(obj.items) && obj.items.some((x: any) => x?.name && x?.id)) found.push(obj)
+    if (Array.isArray(obj.items) && obj.items.some((x: any) => x?.name && (x?.id || x?.placeId || x?.businessId))) found.push(obj)
     for (const child of Object.values(obj)) {
       if (child && typeof child === 'object') found.push(...findItemBlocks(child))
     }
@@ -204,9 +204,9 @@ export function matchPlace(places: NaverPlace[], input: string): NaverPlace | nu
   const trimmed = input.trim()
   if (!trimmed) return null
 
-  // 숫자로만 이루어진 입력 → 플레이스 ID 직접 매칭
+  // 숫자로만 이루어진 입력 → 플레이스 ID 직접 매칭 (D1이 number로 반환할 수 있어 String() 변환)
   if (/^\d+$/.test(trimmed)) {
-    const byId = places.find((p) => p.place_id === trimmed)
+    const byId = places.find((p) => String(p.place_id) === trimmed)
     if (byId) return byId
   }
 

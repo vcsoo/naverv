@@ -116,7 +116,7 @@ export async function findPlaceInLatest(db: D1Database, query: string, placeName
   if (!ranking) return null
   const places: NaverPlace[] = ranking.list.map((r: any) => ({
     rank: r.rank,
-    place_id: r.place_id || '',
+    place_id: String(r.place_id ?? ''),   // D1이 number로 반환할 수 있어 강제 변환
     name: r.place_name,
     address: r.address || '',
     category: r.category || '',
