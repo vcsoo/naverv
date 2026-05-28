@@ -1,5 +1,6 @@
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { ensureRanking, findPlaceInLatest, getPlaceHistory, getLatestRankingList } from '../../../src/shared/db'
+import { isDummy, getDummySingle, getDummyList, DUMMY_QUERY } from '../../../src/shared/dummy'
 
 export const runtime = 'edge'
 
@@ -8,13 +9,24 @@ export const runtime = 'edge'
 // GET /api/lookup?query=...&place=... → single business result
 export async function GET(request: Request) {
   try {
-    const { env } = getRequestContext()
-    const db = (env as any).DB
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query') || ''
     const place = searchParams.get('place') || ''
 
     if (!query) return Response.json({ error: 'query required' }, { status: 400 })
+
+    const todayKst = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
+
+    // 더미 데이터 처리 (키워드="테스트", 상호명="테스트")
+    if (query === DUMMY_QUERY && place && isDummy(query, place)) {
+      return Response.json(getDummySingle(todayKst))
+    }
+    if (query === DUMMY_QUERY && !place) {
+      return Response.json(getDummyList(todayKst))
+    }
+
+    const { env } = getRequestContext()
+    const db = (env as any).DB
 
     await ensureRanking(db, query, 100)
 

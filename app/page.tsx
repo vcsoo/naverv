@@ -163,21 +163,42 @@ export default function Home() {
   function renderCell(row: Row, date: string) {
     const h = row.history.find(x => x.date === date)
     if (!h) return <td key={date} className="dc dc-nil">—</td>
+
     const sorted = [...row.history].sort((a, b) => a.date < b.date ? -1 : 1)
     const idx = sorted.findIndex(x => x.date === date)
     const prev = idx > 0 ? sorted[idx - 1] : null
-    let chg: React.ReactNode
-    if (!prev) { chg = <span className="rc rc-nw">N</span> }
-    else {
-      const d = prev.rank - h.rank
-      chg = d > 0 ? <span className="rc rc-up">▲{d}</span>
-          : d < 0 ? <span className="rc rc-dn">▼{Math.abs(d)}</span>
-          : <span className="rc rc-sm">━</span>
+
+    const rankDiff  = prev ? prev.rank  - h.rank  : null   // 양수 = 순위 상승
+    const blogDiff  = prev ? h.blog  - prev.blog  : null   // 양수 = 증가
+    const visitDiff = prev ? h.visit - prev.visit : null   // 양수 = 증가
+
+    function chgSpan(diff: number | null, isNew?: boolean) {
+      if (isNew)       return <span className="rc rc-nw">N</span>
+      if (diff === null) return null
+      if (diff > 0)    return <span className="rc rc-up">▲{diff.toLocaleString()}</span>
+      if (diff < 0)    return <span className="rc rc-dn">▼{Math.abs(diff).toLocaleString()}</span>
+      return <span className="rc rc-sm">━</span>
     }
+
     return (
       <td key={date} className="dc">
-        <div className={`rv ${rCls(h.rank)}`}>{h.rank}</div>
-        {chg}
+        {/* 순위 */}
+        <div className="dc-rk">
+          <div className={`rv ${rCls(h.rank)}`}>{h.rank}</div>
+          {chgSpan(rankDiff, prev === null)}
+        </div>
+        {/* 블로그 */}
+        <div className="dc-stat">
+          <span className="dc-lbl">블</span>
+          <span className="dc-num blog">{h.blog.toLocaleString()}</span>
+          {chgSpan(blogDiff)}
+        </div>
+        {/* 방문자 */}
+        <div className="dc-stat">
+          <span className="dc-lbl">방</span>
+          <span className="dc-num visit">{h.visit.toLocaleString()}</span>
+          {chgSpan(visitDiff)}
+        </div>
       </td>
     )
   }
@@ -291,19 +312,24 @@ export default function Home() {
         .btn-del:hover{border-color:var(--red);color:var(--red)}
 
         /* Date header */
-        .dhdr{padding:7px 2px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;width:52px;min-width:52px;text-align:center}
+        .dhdr{padding:7px 2px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;width:96px;min-width:96px;text-align:center}
         .dh-d{font-family:monospace;font-size:.7rem;font-weight:700;color:var(--txt)}
         .dh-w{font-size:.58rem;color:var(--sub);margin-top:1px}
         .dhdr.today{background:#f0fff8}.dhdr.today .dh-d{color:var(--gd)}
         .dhdr.sun .dh-d{color:var(--red)}.dhdr.sat .dh-d{color:var(--blue)}
 
         /* Data cell */
-        .dc{padding:5px 2px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;width:52px;min-width:52px;vertical-align:middle}
-        .dc-nil{color:#cbd5e1;font-size:.76rem}
-        .rv{font-family:monospace;font-size:.76rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;margin:0 auto}
+        .dc{padding:6px 4px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;width:96px;min-width:96px;vertical-align:top}
+        .dc-nil{color:#cbd5e1;font-size:.76rem;vertical-align:middle!important;text-align:center}
+        .dc-rk{display:flex;flex-direction:column;align-items:center;margin-bottom:4px}
+        .dc-stat{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:2px;line-height:1.2}
+        .dc-lbl{color:var(--sub);font-weight:700;font-size:.58rem;flex-shrink:0}
+        .dc-num{font-family:monospace;font-weight:600;font-size:.62rem}
+        .dc-num.blog{color:var(--gd)}.dc-num.visit{color:var(--blue)}
+        .rv{font-family:monospace;font-size:.78rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;margin:0 auto}
         .rv.r1{background:var(--gold);color:#5a3800}.rv.r3{background:var(--org);color:#fff}
         .rv.r10{background:var(--gb);color:var(--gd)}.rv.rn{background:#f0f4f8;color:var(--txt)}
-        .rc{font-size:.58rem;font-weight:700;display:block;margin-top:2px}
+        .rc{font-size:.6rem;font-weight:700;display:block;margin-top:2px}
         .rc-up{color:var(--red)}.rc-dn{color:var(--blue)}.rc-sm{color:var(--sub)}.rc-nw{color:var(--g)}
 
         @keyframes spin{to{transform:rotate(360deg)}}
