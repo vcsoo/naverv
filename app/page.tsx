@@ -25,7 +25,6 @@ type ListItem = {
 type ListResult = { list: ListItem[]; collected_at: string }
 
 export default function Home() {
-  // ── Search state ────────────────────────────────────────────
   const [srchQ, setSrchQ] = useState('')
   const [srchP, setSrchP] = useState('')
   const [searching, setSearching] = useState(false)
@@ -34,15 +33,28 @@ export default function Home() {
   const [single, setSingle] = useState<SingleResult | null>(null)
   const [listRes, setListRes] = useState<ListResult | null>(null)
 
-  // ── Dashboard state ──────────────────────────────────────────
   const [rows, setRows] = useState<Row[]>([])
   const [dates, setDates] = useState<string[]>([])
   const [dayFilter, setDayFilter] = useState<7 | 14 | 30>(7)
   const [registering, setRegistering] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
 
   useEffect(() => { loadDashboard() }, [])
+  useEffect(() => { if (window.innerWidth < 700) setViewMode('card') }, [])
 
   const mkKey = (sq: string, pi: string) => `${sq}||${pi}`
+  const rCls  = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
+  const tCls  = (r: number) => r === 1 ? 't1' : r <= 3 ? 't3' : r <= 10 ? 't10' : ''
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
+
+  // ── 공통 변동 표시 ────────────────────────────────────────
+  const chgSpan = (diff: number | null, isNew?: boolean): React.ReactNode => {
+    if (isNew)         return <span className="rc rc-nw">N</span>
+    if (diff === null) return null
+    if (diff > 0)      return <span className="rc rc-up">▲{diff.toLocaleString()}</span>
+    if (diff < 0)      return <span className="rc rc-dn">▼{Math.abs(diff).toLocaleString()}</span>
+    return                    <span className="rc rc-sm">━</span>
+  }
 
   function calcDates(rowList: Row[]) {
     const s = new Set<string>()
@@ -88,7 +100,6 @@ export default function Home() {
     calcDates(done)
   }
 
-  // ── Search ───────────────────────────────────────────────────
   async function search() {
     const q = srchQ.trim()
     if (!q) { alert('검색어를 입력해주세요'); return }
@@ -103,7 +114,6 @@ export default function Home() {
     finally { setSearching(false) }
   }
 
-  // ── Register ─────────────────────────────────────────────────
   async function registerItem(sq: string, pi: string, mn: string | null) {
     if (rows.length >= 10) { alert('최대 10개까지 등록 가능합니다'); return }
     setRegistering(mkKey(sq, pi))
@@ -118,29 +128,16 @@ export default function Home() {
     finally { setRegistering(null) }
   }
 
-  // ── Delete ───────────────────────────────────────────────────
   async function del(row: Row) {
     const nm = row.matched_name || row.place_name_input
     if (!confirm(`"${row.search_query} / ${nm}" 삭제하시겠습니까?`)) return
-    await fetch(
-      `/api/targets?query=${encodeURIComponent(row.search_query)}&place=${encodeURIComponent(row.place_name_input)}`,
-      { method: 'DELETE' }
-    )
+    await fetch(`/api/targets?query=${encodeURIComponent(row.search_query)}&place=${encodeURIComponent(row.place_name_input)}`, { method: 'DELETE' })
     const next = rows.filter(r => r.key !== row.key)
     setRows(next); calcDates(next)
   }
 
-  // ── Helpers ──────────────────────────────────────────────────
-  const rCls = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
-  const tCls = (r: number) => r === 1 ? 't1' : r <= 3 ? 't3' : r <= 10 ? 't10' : ''
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
   const visibleDates = dates.slice(0, dayFilter)
 
-  function isRegistered(sq: string, pn: string) {
-    return rows.some(r => r.search_query === sq && (r.matched_name === pn || r.place_name_input === pn))
-  }
-
-  // Group rows by keyword, preserving insertion order
   const groups: [string, Row[]][] = []
   const seenQ = new Set<string>()
   for (const row of rows) {
@@ -148,6 +145,10 @@ export default function Home() {
       seenQ.add(row.search_query)
       groups.push([row.search_query, rows.filter(r => r.search_query === row.search_query)])
     }
+  }
+
+  function isRegistered(sq: string, pn: string) {
+    return rows.some(r => r.search_query === sq && (r.matched_name === pn || r.place_name_input === pn))
   }
 
   function chgBadge(cur: number, prev: number | null | undefined) {
@@ -160,40 +161,30 @@ export default function Home() {
         : <span className="badge badge-sm">━ 유지</span>
   }
 
+  // ── 표 뷰: 셀 렌더링 ────────────────────────────────────
   function renderCell(row: Row, date: string) {
     const h = row.history.find(x => x.date === date)
     if (!h) return <td key={date} className="dc dc-nil">—</td>
 
     const sorted = [...row.history].sort((a, b) => a.date < b.date ? -1 : 1)
-    const idx = sorted.findIndex(x => x.date === date)
+    const idx  = sorted.findIndex(x => x.date === date)
     const prev = idx > 0 ? sorted[idx - 1] : null
 
-    const rankDiff  = prev ? prev.rank  - h.rank  : null   // 양수 = 순위 상승
-    const blogDiff  = prev ? h.blog  - prev.blog  : null   // 양수 = 증가
-    const visitDiff = prev ? h.visit - prev.visit : null   // 양수 = 증가
-
-    function chgSpan(diff: number | null, isNew?: boolean) {
-      if (isNew)       return <span className="rc rc-nw">N</span>
-      if (diff === null) return null
-      if (diff > 0)    return <span className="rc rc-up">▲{diff.toLocaleString()}</span>
-      if (diff < 0)    return <span className="rc rc-dn">▼{Math.abs(diff).toLocaleString()}</span>
-      return <span className="rc rc-sm">━</span>
-    }
+    const rankDiff  = prev ? prev.rank  - h.rank  : null
+    const blogDiff  = prev ? h.blog  - prev.blog  : null
+    const visitDiff = prev ? h.visit - prev.visit : null
 
     return (
       <td key={date} className="dc">
-        {/* 순위 */}
         <div className="dc-rk">
           <div className={`rv ${rCls(h.rank)}`}>{h.rank}</div>
           {chgSpan(rankDiff, prev === null)}
         </div>
-        {/* 블로그 */}
         <div className="dc-stat">
           <span className="dc-lbl">블</span>
           <span className="dc-num blog">{h.blog.toLocaleString()}</span>
           {chgSpan(blogDiff)}
         </div>
-        {/* 방문자 */}
         <div className="dc-stat">
           <span className="dc-lbl">방</span>
           <span className="dc-num visit">{h.visit.toLocaleString()}</span>
@@ -203,7 +194,80 @@ export default function Home() {
     )
   }
 
-  // ── Render ───────────────────────────────────────────────────
+  // ── 카드 뷰: 업체 카드 렌더링 ────────────────────────────
+  function renderCard(row: Row) {
+    const sorted = [...row.history].sort((a, b) => a.date < b.date ? -1 : 1)
+    const last  = sorted[sorted.length - 1]
+    const prev  = sorted[sorted.length - 2]
+    const last7 = sorted.slice(-7)
+
+    const rankDiff  = (last && prev) ? prev.rank  - last.rank  : null
+    const blogDiff  = (last && prev) ? last.blog  - prev.blog  : null
+    const visitDiff = (last && prev) ? last.visit - prev.visit : null
+
+    return (
+      <div key={row.key} className="crd">
+        {/* 업체명 + 삭제 */}
+        <div className="crd-top">
+          <span className="crd-name">{row.matched_name || row.place_name_input}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {row.loading && <span className="spin-sm" />}
+            {row.error   && <span className="rl-err">{row.error}</span>}
+            <button className="btn-del" onClick={() => del(row)}>✕</button>
+          </div>
+        </div>
+
+        {last && (
+          <>
+            {/* 오늘 핵심 수치 */}
+            <div className="crd-main">
+              <div className="crd-rk-wrap">
+                <span className={`crd-rank ${tCls(last.rank)}`}>{last.rank}위</span>
+                {chgSpan(rankDiff, !prev)}
+              </div>
+              <div className="crd-counts">
+                <div className="crd-cnt">
+                  <span className="crd-lbl">블</span>
+                  <span className="crd-val blog">{last.blog.toLocaleString()}</span>
+                  {chgSpan(blogDiff)}
+                </div>
+                <div className="crd-cnt">
+                  <span className="crd-lbl">방</span>
+                  <span className="crd-val visit">{last.visit.toLocaleString()}</span>
+                  {chgSpan(visitDiff)}
+                </div>
+              </div>
+            </div>
+
+            {/* 최근 7일 미니 순위 */}
+            {last7.length > 1 && (
+              <div className="crd-hist">
+                {last7.map((h, i) => {
+                  const dt = new Date(h.date + 'T00:00:00')
+                  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+                  const dd = String(dt.getDate()).padStart(2, '0')
+                  const prevH = i > 0 ? last7[i - 1] : null
+                  const rd = prevH ? prevH.rank - h.rank : null
+                  const isToday = h.date === today
+                  return (
+                    <div key={h.date} className={`crd-day${isToday ? ' crd-today' : ''}`}>
+                      <div className="crd-day-lbl">{isToday ? '오늘' : `${mm}.${dd}`}</div>
+                      <div className={`mob-rv ${rCls(h.rank)}`}>{h.rank}</div>
+                      <div className={`mob-chg ${rd === null ? 'rc-nw' : rd > 0 ? 'rc-up' : rd < 0 ? 'rc-dn' : 'rc-sm'}`}>
+                        {rd === null ? 'N' : rd > 0 ? `▲${rd}` : rd < 0 ? `▼${Math.abs(rd)}` : '━'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // ── Render ─────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -216,12 +280,10 @@ export default function Home() {
         .hdr p{color:rgba(255,255,255,.75);font-size:.7rem;margin-top:2px}
 
         .wrap{max-width:1400px;margin:0 auto;padding:18px 16px;display:flex;flex-direction:column;gap:16px}
-
-        /* Card */
         .card{background:var(--surf);border-radius:var(--r);padding:18px 22px;box-shadow:0 2px 12px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.05)}
         .card-title{font-size:.9rem;font-weight:700;margin-bottom:14px}
 
-        /* Search form */
+        /* 검색폼 */
         .srow{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
         .fg label{display:block;font-size:.7rem;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
         .hint-lbl{font-size:.64rem;font-weight:400;color:var(--sub);text-transform:none;margin-left:3px}
@@ -233,7 +295,7 @@ export default function Home() {
         .srch-info{margin-top:10px;font-size:.72rem;color:var(--sub);display:flex;align-items:center;gap:6px}
         .srch-spin{width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block}
 
-        /* Single result card */
+        /* 단일 결과 카드 */
         .res-card{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr)}
         .res-top{background:linear-gradient(135deg,#1a2332,#2d3f55);padding:16px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
         .res-name{color:#fff;font-size:1.08rem;font-weight:700}
@@ -243,22 +305,15 @@ export default function Home() {
         .res-rank.t1{color:var(--gold)}.res-rank.t3{color:var(--org)}.res-rank.t10{color:var(--gd)}
         .res-meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
         .cnt{font-size:.78rem}.cnt-blog{color:var(--gd)}.cnt-visit{color:var(--blue)}.cnt-time{color:var(--sub);font-size:.7rem}
-
-        /* Badges */
         .badge{padding:3px 8px;border-radius:5px;font-size:.72rem;font-weight:700}
-        .badge-nw{background:rgba(3,199,90,.14);color:var(--gd)}
-        .badge-up{background:rgba(232,25,44,.11);color:var(--red)}
-        .badge-dn{background:rgba(25,103,210,.11);color:var(--blue)}
-        .badge-sm{background:#f0f4f8;color:var(--sub)}
+        .badge-nw{background:rgba(3,199,90,.14);color:var(--gd)}.badge-up{background:rgba(232,25,44,.11);color:var(--red)}
+        .badge-dn{background:rgba(25,103,210,.11);color:var(--blue)}.badge-sm{background:#f0f4f8;color:var(--sub)}
         .badge-reg{padding:5px 12px;border-radius:7px;font-size:.76rem;font-weight:700;background:var(--gb);color:var(--gd);border:1px solid rgba(3,199,90,.3)}
-
         .btn-reg{padding:7px 15px;background:var(--g);color:#fff;border:none;border-radius:7px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap}
         .btn-reg:hover:not(:disabled){background:var(--gd)}.btn-reg:disabled{opacity:.5;cursor:not-allowed}
-
-        /* Not found */
         .not-found{background:#fff8f8;border:1.5px solid #ffcdd2;border-radius:var(--r);padding:14px 18px;color:#c62828;font-size:.84rem}
 
-        /* List result */
+        /* 전체 순위 목록 */
         .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
         .list-header h3{font-size:.88rem;font-weight:700}
         .list-time{font-size:.7rem;color:var(--sub)}
@@ -275,31 +330,25 @@ export default function Home() {
         .btn-add{padding:3px 9px;border:1.5px solid var(--g);color:var(--gd);background:#fff;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap}
         .btn-add:hover:not(:disabled){background:var(--gb)}.btn-add:disabled{opacity:.5;cursor:not-allowed}
 
-        /* Dashboard */
+        /* 대시보드 공통 */
         .dash{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr)}
-        .dash-top{padding:12px 18px;border-bottom:1px solid var(--bdr);background:#fafbfc;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+        .dash-top{padding:12px 18px;border-bottom:1px solid var(--bdr);background:#fafbfc;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
         .dash-title{font-size:.9rem;font-weight:700}
         .dash-cnt{font-size:.7rem;color:var(--sub);font-weight:400;margin-left:4px}
-        .dash-ctrl{display:flex;align-items:center;gap:6px}
-        .day-btn{padding:4px 12px;border:1.5px solid var(--bdr);background:#fff;border-radius:6px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--mut);transition:.12s}
-        .day-btn.on{background:var(--g);color:#fff;border-color:var(--g)}
-        .day-btn:not(.on):hover{border-color:var(--g);color:var(--gd)}
-        .btn-sm{padding:4px 9px;border:1.5px solid var(--bdr);background:#fff;border-radius:6px;font-size:.74rem;cursor:pointer;color:var(--mut)}
-        .btn-sm:hover{border-color:var(--g);color:var(--gd)}
-
+        .dash-ctrl{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+        .day-btn,.view-btn,.btn-sm{padding:4px 11px;border:1.5px solid var(--bdr);background:#fff;border-radius:6px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--mut);transition:.12s}
+        .day-btn.on,.view-btn.on{background:var(--g);color:#fff;border-color:var(--g)}
+        .day-btn:not(.on):hover,.view-btn:not(.on):hover,.btn-sm:hover{border-color:var(--g);color:var(--gd)}
+        .sep{width:1px;height:20px;background:var(--bdr);flex-shrink:0}
         .empty{padding:46px;text-align:center;color:var(--sub)}
         .empty p{font-size:.82rem;margin-top:8px;line-height:1.7}
 
-        /* Dashboard table */
+        /* ── 표 뷰 ── */
         .dtw{overflow-x:auto}
         .dt{border-collapse:collapse;width:max-content;min-width:100%}
         .dt thead th,.dt tbody td{white-space:nowrap}
-
-        /* Group header row */
         .grp-row td{background:linear-gradient(to right,#f0fff8,#f8fbff);padding:7px 16px;font-size:.76rem;font-weight:700;color:var(--gd);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12)}
         .grp-cnt{font-size:.67rem;color:var(--sub);font-weight:400;margin-left:4px}
-
-        /* Sticky label column */
         .rl-hdr{position:sticky;left:0;z-index:20;background:#f7fafc;padding:9px 14px;text-align:left;border-right:2px solid var(--bdr);border-bottom:2px solid var(--bdr);font-size:.67rem;font-weight:600;color:var(--mut);text-transform:uppercase;width:170px;min-width:170px}
         .rl-cell{position:sticky;left:0;z-index:10;background:#fff;padding:7px 12px;border-right:2px solid var(--bdr);border-bottom:1px solid #f0f4f8;width:170px;min-width:170px}
         .rl-cell:hover{background:#f8fffb}
@@ -310,17 +359,13 @@ export default function Home() {
         .spin-sm{width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block}
         .btn-del{padding:2px 6px;border:1.5px solid #e2e8f0;color:var(--sub);background:#fff;border-radius:4px;font-size:.64rem;cursor:pointer}
         .btn-del:hover{border-color:var(--red);color:var(--red)}
-
-        /* Date header */
         .dhdr{padding:7px 2px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;width:96px;min-width:96px;text-align:center}
         .dh-d{font-family:monospace;font-size:.7rem;font-weight:700;color:var(--txt)}
         .dh-w{font-size:.58rem;color:var(--sub);margin-top:1px}
         .dhdr.today{background:#f0fff8}.dhdr.today .dh-d{color:var(--gd)}
         .dhdr.sun .dh-d{color:var(--red)}.dhdr.sat .dh-d{color:var(--blue)}
-
-        /* Data cell */
         .dc{padding:6px 4px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;width:96px;min-width:96px;vertical-align:top}
-        .dc-nil{color:#cbd5e1;font-size:.76rem;vertical-align:middle!important;text-align:center}
+        .dc-nil{color:#cbd5e1;font-size:.76rem;vertical-align:middle!important}
         .dc-rk{display:flex;flex-direction:column;align-items:center;margin-bottom:4px}
         .dc-stat{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:2px;line-height:1.2}
         .dc-lbl{color:var(--sub);font-weight:700;font-size:.58rem;flex-shrink:0}
@@ -332,6 +377,33 @@ export default function Home() {
         .rc{font-size:.6rem;font-weight:700;display:block;margin-top:2px}
         .rc-up{color:var(--red)}.rc-dn{color:var(--blue)}.rc-sm{color:var(--sub)}.rc-nw{color:var(--g)}
 
+        /* ── 카드 뷰 ── */
+        .card-groups{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+        .crd-group-hdr{font-size:.76rem;font-weight:700;color:var(--gd);padding:6px 2px;display:flex;align-items:center;gap:6px}
+        .crd-group-hdr::after{content:'';flex:1;height:1px;background:rgba(3,199,90,.2)}
+        .crd{background:#fafbfc;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px}
+        .crd + .crd{margin-top:8px}
+        .crd-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+        .crd-name{font-size:.88rem;font-weight:700;color:var(--txt)}
+        .crd-main{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+        .crd-rk-wrap{display:flex;align-items:center;gap:6px;flex-shrink:0}
+        .crd-rank{font-family:monospace;font-size:1.5rem;font-weight:800}
+        .crd-rank.t1{color:var(--gold)}.crd-rank.t3{color:var(--org)}.crd-rank.t10{color:var(--gd)}
+        .crd-counts{display:flex;flex-direction:column;gap:5px}
+        .crd-cnt{display:flex;align-items:center;gap:4px;font-size:.76rem}
+        .crd-lbl{color:var(--sub);font-weight:700;font-size:.68rem;width:10px;flex-shrink:0}
+        .crd-val{font-family:monospace;font-weight:600}
+        .crd-val.blog{color:var(--gd)}.crd-val.visit{color:var(--blue)}
+        .crd-hist{display:flex;gap:6px;padding-top:8px;border-top:1px solid #f0f4f8;overflow-x:auto}
+        .crd-day{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+        .crd-day.crd-today .crd-day-lbl{color:var(--gd);font-weight:700}
+        .crd-day.crd-today .mob-rv{outline:2px solid var(--g);outline-offset:1px}
+        .crd-day-lbl{font-size:.58rem;color:var(--sub);font-family:monospace}
+        .mob-rv{font-family:monospace;font-size:.72rem;font-weight:700;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+        .mob-rv.r1{background:var(--gold);color:#5a3800}.mob-rv.r3{background:var(--org);color:#fff}
+        .mob-rv.r10{background:var(--gb);color:var(--gd)}.mob-rv.rn{background:#f0f4f8;color:var(--txt)}
+        .mob-chg{font-size:.58rem;font-weight:700}
+
         @keyframes spin{to{transform:rotate(360deg)}}
         @media(max-width:640px){.srow{grid-template-columns:1fr}}
       `}</style>
@@ -342,8 +414,7 @@ export default function Home() {
       </header>
 
       <div className="wrap">
-
-        {/* ── 검색 ───────────────────────────────────────────── */}
+        {/* 검색 */}
         <div className="card">
           <div className="card-title">🔍 순위 검색</div>
           <div className="srow">
@@ -373,7 +444,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* ── 단일 업체 결과 ──────────────────────────────────── */}
+        {/* 단일 업체 결과 */}
         {single && !single.not_found && (
           <div className="res-card">
             <div className="res-top">
@@ -382,7 +453,7 @@ export default function Home() {
                 <div className="res-q">검색어: {doneQ}</div>
               </div>
               {isRegistered(doneQ, single.matched_name || doneP)
-                ? <span className="badge-reg">✓ 대시보드에 등록됨</span>
+                ? <span className="badge-reg">✓ 등록됨</span>
                 : <button className="btn-reg"
                     onClick={() => registerItem(doneQ, doneP, single!.matched_name || null)}
                     disabled={registering !== null}>
@@ -408,7 +479,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── 전체 순위 목록 결과 ─────────────────────────────── */}
+        {/* 전체 순위 목록 */}
         {listRes?.list && (
           <div className="card">
             <div className="list-header">
@@ -441,7 +512,7 @@ export default function Home() {
                         <td className="rn-num rn-visit">{(item.visit || 0).toLocaleString()}</td>
                         <td style={{ textAlign: 'center' }}>
                           {reg
-                            ? <span className="badge badge-nw" style={{ fontSize: '.68rem' }}>✓ 등록됨</span>
+                            ? <span className="badge badge-nw" style={{ fontSize: '.68rem' }}>✓</span>
                             : <button className="btn-add"
                                 onClick={() => registerItem(doneQ, item.place_name, item.place_name)}
                                 disabled={registering !== null}>
@@ -458,7 +529,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── 대시보드 ────────────────────────────────────────── */}
+        {/* 대시보드 */}
         <div className="dash">
           <div className="dash-top">
             <span className="dash-title">
@@ -466,10 +537,22 @@ export default function Home() {
               <span className="dash-cnt">{rows.length}개 등록</span>
             </span>
             <div className="dash-ctrl">
-              {([7, 14, 30] as const).map(d => (
-                <button key={d} className={`day-btn${dayFilter === d ? ' on' : ''}`}
-                  onClick={() => setDayFilter(d)}>{d}일</button>
-              ))}
+              {/* 뷰 토글 */}
+              <button className={`view-btn${viewMode === 'card' ? ' on' : ''}`}
+                onClick={() => setViewMode('card')} title="카드 뷰">📋 카드</button>
+              <button className={`view-btn${viewMode === 'table' ? ' on' : ''}`}
+                onClick={() => setViewMode('table')} title="표 뷰">📊 표</button>
+
+              {/* 표 뷰일 때만 날짜 탭 */}
+              {viewMode === 'table' && (
+                <>
+                  <div className="sep" />
+                  {([7, 14, 30] as const).map(d => (
+                    <button key={d} className={`day-btn${dayFilter === d ? ' on' : ''}`}
+                      onClick={() => setDayFilter(d)}>{d}일</button>
+                  ))}
+                </>
+              )}
               <button className="btn-sm" onClick={loadDashboard} title="새로고침">↻</button>
             </div>
           </div>
@@ -477,9 +560,20 @@ export default function Home() {
           {rows.length === 0 ? (
             <div className="empty">
               <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>📋</div>
-              <p>등록된 항목이 없습니다.<br />위에서 검색 후 &quot;+ 대시보드에 등록&quot; 버튼으로 추가하세요.</p>
+              <p>등록된 항목이 없습니다.<br />위에서 검색 후 &quot;+ 대시보드에 등록&quot;으로 추가하세요.</p>
+            </div>
+          ) : viewMode === 'card' ? (
+            /* ── 카드 뷰 ── */
+            <div className="card-groups">
+              {groups.map(([query, groupRows]) => (
+                <div key={query}>
+                  <div className="crd-group-hdr">🔑 {query}</div>
+                  {groupRows.map(row => renderCard(row))}
+                </div>
+              ))}
             </div>
           ) : (
+            /* ── 표 뷰 ── */
             <div className="dtw">
               <table className="dt">
                 <thead>
