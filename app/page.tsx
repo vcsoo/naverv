@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 
 const WD = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -13,17 +13,36 @@ type Row = {
   loading: boolean
   error?: string
 }
+type SingleResult = {
+  matched_name?: string; rank?: number; prev_rank?: number | null
+  blog?: number; visit?: number; collected_at?: string
+  not_found?: boolean; total_collected?: number; history?: H[]
+}
+type ListItem = {
+  rank: number; place_name: string; category: string
+  blog: number; visit: number; address: string
+}
+type ListResult = { list: ListItem[]; collected_at: string }
 
 export default function Home() {
-  const [regQuery, setRegQuery] = useState('')
-  const [regPlace, setRegPlace] = useState('')
-  const [registering, setRegistering] = useState(false)
+  // ── Search state ────────────────────────────────────────────
+  const [srchQ, setSrchQ] = useState('')
+  const [srchP, setSrchP] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [doneQ, setDoneQ] = useState('')
+  const [doneP, setDoneP] = useState('')
+  const [single, setSingle] = useState<SingleResult | null>(null)
+  const [listRes, setListRes] = useState<ListResult | null>(null)
+
+  // ── Dashboard state ──────────────────────────────────────────
   const [rows, setRows] = useState<Row[]>([])
   const [dates, setDates] = useState<string[]>([])
+  const [dayFilter, setDayFilter] = useState<7 | 14 | 30>(7)
+  const [registering, setRegistering] = useState<string | null>(null)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => { loadDashboard() }, [])
 
-  function mkKey(t: any) { return `${t.search_query}||${t.place_name_input}` }
+  const mkKey = (sq: string, pi: string) => `${sq}||${pi}`
 
   function calcDates(rowList: Row[]) {
     const s = new Set<string>()
@@ -34,24 +53,20 @@ export default function Home() {
   async function fetchHistory(query: string, place: string) {
     try {
       const r = await fetch(`/api/history?query=${encodeURIComponent(query)}&place=${encodeURIComponent(place)}`)
-      if (!r.ok) return null
-      return await r.json()
+      return r.ok ? await r.json() : null
     } catch { return null }
   }
 
-  async function loadAll() {
+  async function loadDashboard() {
     const r = await fetch('/api/targets')
     const tList: any[] = await r.json()
-
-    if (!Array.isArray(tList) || tList.length === 0) {
-      setRows([])
-      setDates([])
-      return
-    }
+    if (!Array.isArray(tList) || !tList.length) { setRows([]); setDates([]); return }
 
     setRows(tList.map(t => ({
-      key: mkKey(t), search_query: t.search_query,
-      place_name_input: t.place_name_input, matched_name: t.matched_name,
+      key: mkKey(t.search_query, t.place_name_input),
+      search_query: t.search_query,
+      place_name_input: t.place_name_input,
+      matched_name: t.matched_name,
       history: [], loading: true,
     })))
 
@@ -59,7 +74,8 @@ export default function Home() {
     for (const t of tList) {
       const data = await fetchHistory(t.search_query, t.matched_name || t.place_name_input)
       const row: Row = {
-        key: mkKey(t), search_query: t.search_query,
+        key: mkKey(t.search_query, t.place_name_input),
+        search_query: t.search_query,
         place_name_input: t.place_name_input,
         matched_name: data?.matched_name || t.matched_name,
         history: data?.history || [],
@@ -72,30 +88,37 @@ export default function Home() {
     calcDates(done)
   }
 
-  async function register() {
-    const q = regQuery.trim(), p = regPlace.trim()
-    if (!q || !p) { alert('검색어와 상호명을 모두 입력해주세요'); return }
-    if (rows.length >= 10) { alert('최대 10개까지 등록 가능합니다'); return }
-
-    setRegistering(true)
+  // ── Search ───────────────────────────────────────────────────
+  async function search() {
+    const q = srchQ.trim()
+    if (!q) { alert('검색어를 입력해주세요'); return }
+    setSearching(true); setSingle(null); setListRes(null)
     try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ search_query: q, place_name: p }),
-      })
-      const data = await res.json()
-      if (data.not_found) {
-        alert(`"${p}"을(를) "${q}" 검색결과 ${data.total_collected}위 내에서 찾을 수 없습니다.`)
-        return
-      }
-      if (data.error) { alert('오류: ' + data.error); return }
-      setRegQuery(''); setRegPlace('')
-      await loadAll()
+      const p = srchP.trim()
+      const url = `/api/lookup?query=${encodeURIComponent(q)}${p ? `&place=${encodeURIComponent(p)}` : ''}`
+      const data = await fetch(url).then(r => r.json())
+      setDoneQ(q); setDoneP(p)
+      if (p) setSingle(data); else setListRes(data)
     } catch { alert('오류가 발생했습니다. 다시 시도해주세요.') }
-    finally { setRegistering(false) }
+    finally { setSearching(false) }
   }
 
+  // ── Register ─────────────────────────────────────────────────
+  async function registerItem(sq: string, pi: string, mn: string | null) {
+    if (rows.length >= 10) { alert('최대 10개까지 등록 가능합니다'); return }
+    setRegistering(mkKey(sq, pi))
+    try {
+      await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ search_query: sq, place_name_input: pi, matched_name: mn }),
+      })
+      await loadDashboard()
+    } catch { alert('등록 중 오류가 발생했습니다.') }
+    finally { setRegistering(null) }
+  }
+
+  // ── Delete ───────────────────────────────────────────────────
   async function del(row: Row) {
     const nm = row.matched_name || row.place_name_input
     if (!confirm(`"${row.search_query} / ${nm}" 삭제하시겠습니까?`)) return
@@ -104,113 +127,188 @@ export default function Home() {
       { method: 'DELETE' }
     )
     const next = rows.filter(r => r.key !== row.key)
-    setRows(next)
-    calcDates(next)
+    setRows(next); calcDates(next)
   }
 
-  function rCls(r: number) { return r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn' }
-
+  // ── Helpers ──────────────────────────────────────────────────
+  const rCls = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
+  const tCls = (r: number) => r === 1 ? 't1' : r <= 3 ? 't3' : r <= 10 ? 't10' : ''
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
+  const visibleDates = dates.slice(0, dayFilter)
+
+  function isRegistered(sq: string, pn: string) {
+    return rows.some(r => r.search_query === sq && (r.matched_name === pn || r.place_name_input === pn))
+  }
+
+  // Group rows by keyword, preserving insertion order
+  const groups: [string, Row[]][] = []
+  const seenQ = new Set<string>()
+  for (const row of rows) {
+    if (!seenQ.has(row.search_query)) {
+      seenQ.add(row.search_query)
+      groups.push([row.search_query, rows.filter(r => r.search_query === row.search_query)])
+    }
+  }
+
+  function chgBadge(cur: number, prev: number | null | undefined) {
+    if (prev == null) return <span className="badge badge-nw">NEW</span>
+    const d = prev - cur
+    return d > 0
+      ? <span className="badge badge-up">▲{d} 상승</span>
+      : d < 0
+        ? <span className="badge badge-dn">▼{Math.abs(d)} 하락</span>
+        : <span className="badge badge-sm">━ 유지</span>
+  }
 
   function renderCell(row: Row, date: string) {
     const h = row.history.find(x => x.date === date)
-    if (!h) return <td key={date} className="dc dc-nil"><span>—</span></td>
-
+    if (!h) return <td key={date} className="dc dc-nil">—</td>
     const sorted = [...row.history].sort((a, b) => a.date < b.date ? -1 : 1)
     const idx = sorted.findIndex(x => x.date === date)
     const prev = idx > 0 ? sorted[idx - 1] : null
-
     let chg: React.ReactNode
-    if (!prev) {
-      chg = <span className="rc rc-nw">NEW</span>
-    } else {
+    if (!prev) { chg = <span className="rc rc-nw">N</span> }
+    else {
       const d = prev.rank - h.rank
       chg = d > 0 ? <span className="rc rc-up">▲{d}</span>
           : d < 0 ? <span className="rc rc-dn">▼{Math.abs(d)}</span>
           : <span className="rc rc-sm">━</span>
     }
-
     return (
       <td key={date} className="dc">
         <div className={`rv ${rCls(h.rank)}`}>{h.rank}</div>
         {chg}
-        <div className="cbl">블 {h.blog.toLocaleString()}</div>
-        <div className="cvs">방 {h.visit.toLocaleString()}</div>
       </td>
     )
   }
 
+  // ── Render ───────────────────────────────────────────────────
   return (
     <>
       <style>{`
         :root{--g:#03c75a;--gd:#00a045;--gb:#e8faf1;--blue:#1967d2;--red:#e8192c;--org:#ff9500;--gold:#e6aa00;--bg:#f0f4f8;--surf:#fff;--bdr:#e2e8f0;--txt:#1a2332;--mut:#64748b;--sub:#94a3b8;--r:12px}
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+
         .hdr{background:linear-gradient(135deg,#03c75a,#00b44a 45%,#0597d8);padding:14px 24px;position:sticky;top:0;z-index:200}
-        .hdr h1{color:#fff;font-size:1.1rem;font-weight:700}
-        .hdr p{color:rgba(255,255,255,.75);font-size:.72rem;margin-top:2px}
-        .wrap{max-width:1400px;margin:0 auto;padding:20px 16px}
-        .regcard{background:var(--surf);border-radius:var(--r);padding:18px 22px;box-shadow:0 2px 14px rgba(0,0,0,.07);margin-bottom:18px;border:1px solid rgba(3,199,90,.12)}
-        .regrow{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
-        .fg label{display:block;font-size:.7rem;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+        .hdr h1{color:#fff;font-size:1.05rem;font-weight:700}
+        .hdr p{color:rgba(255,255,255,.75);font-size:.7rem;margin-top:2px}
+
+        .wrap{max-width:1400px;margin:0 auto;padding:18px 16px;display:flex;flex-direction:column;gap:16px}
+
+        /* Card */
+        .card{background:var(--surf);border-radius:var(--r);padding:18px 22px;box-shadow:0 2px 12px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.05)}
+        .card-title{font-size:.9rem;font-weight:700;margin-bottom:14px}
+
+        /* Search form */
+        .srow{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+        .fg label{display:block;font-size:.7rem;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
+        .hint-lbl{font-size:.64rem;font-weight:400;color:var(--sub);text-transform:none;margin-left:3px}
         .fg input{width:100%;height:42px;padding:0 12px;border:2px solid var(--bdr);border-radius:8px;font-size:.88rem;outline:none;transition:.15s;background:#fff}
         .fg input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(3,199,90,.08)}
         .fg input:disabled{background:#f7fafc;color:var(--sub)}
-        .btn-main{height:42px;padding:0 22px;background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
-        .btn-main:hover{opacity:.9}.btn-main:disabled{opacity:.5;cursor:not-allowed}
-        .reghint{margin-top:8px;font-size:.71rem;color:var(--sub)}
-        .board{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 14px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr)}
-        .board-hdr{padding:11px 18px;border-bottom:1px solid var(--bdr);background:#fafbfc;display:flex;align-items:center;justify-content:space-between}
-        .board-hdr h2{font-size:.88rem;font-weight:700}
-        .btn-sm{padding:4px 10px;border:1.5px solid var(--bdr);background:#fff;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--mut);transition:.12s}
+        .btn-search{height:42px;padding:0 20px;background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;border:none;border-radius:8px;font-size:.88rem;font-weight:700;cursor:pointer;white-space:nowrap}
+        .btn-search:hover:not(:disabled){opacity:.9}.btn-search:disabled{opacity:.5;cursor:not-allowed}
+        .srch-info{margin-top:10px;font-size:.72rem;color:var(--sub);display:flex;align-items:center;gap:6px}
+        .srch-spin{width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block}
+
+        /* Single result card */
+        .res-card{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr)}
+        .res-top{background:linear-gradient(135deg,#1a2332,#2d3f55);padding:16px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+        .res-name{color:#fff;font-size:1.08rem;font-weight:700}
+        .res-q{color:rgba(255,255,255,.5);font-size:.71rem;margin-top:3px}
+        .res-body{padding:14px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+        .res-rank{font-family:monospace;font-size:1.5rem;font-weight:700}
+        .res-rank.t1{color:var(--gold)}.res-rank.t3{color:var(--org)}.res-rank.t10{color:var(--gd)}
+        .res-meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+        .cnt{font-size:.78rem}.cnt-blog{color:var(--gd)}.cnt-visit{color:var(--blue)}.cnt-time{color:var(--sub);font-size:.7rem}
+
+        /* Badges */
+        .badge{padding:3px 8px;border-radius:5px;font-size:.72rem;font-weight:700}
+        .badge-nw{background:rgba(3,199,90,.14);color:var(--gd)}
+        .badge-up{background:rgba(232,25,44,.11);color:var(--red)}
+        .badge-dn{background:rgba(25,103,210,.11);color:var(--blue)}
+        .badge-sm{background:#f0f4f8;color:var(--sub)}
+        .badge-reg{padding:5px 12px;border-radius:7px;font-size:.76rem;font-weight:700;background:var(--gb);color:var(--gd);border:1px solid rgba(3,199,90,.3)}
+
+        .btn-reg{padding:7px 15px;background:var(--g);color:#fff;border:none;border-radius:7px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap}
+        .btn-reg:hover:not(:disabled){background:var(--gd)}.btn-reg:disabled{opacity:.5;cursor:not-allowed}
+
+        /* Not found */
+        .not-found{background:#fff8f8;border:1.5px solid #ffcdd2;border-radius:var(--r);padding:14px 18px;color:#c62828;font-size:.84rem}
+
+        /* List result */
+        .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+        .list-header h3{font-size:.88rem;font-weight:700}
+        .list-time{font-size:.7rem;color:var(--sub)}
+        .list-scroll{max-height:420px;overflow-y:auto;border:1px solid var(--bdr);border-radius:8px}
+        .rtable{width:100%;border-collapse:collapse;font-size:.82rem}
+        .rtable thead th{background:#f7fafc;padding:8px 12px;text-align:left;font-weight:600;color:var(--mut);border-bottom:2px solid var(--bdr);font-size:.68rem;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;z-index:2}
+        .rtable tbody tr{border-bottom:1px solid #f0f4f8}.rtable tbody tr:hover{background:#f8fffe}
+        .rtable tbody td{padding:8px 12px;vertical-align:middle}
+        .rk{font-family:monospace;font-weight:700;text-align:center;font-size:.84rem}
+        .rk.t1{color:var(--gold)}.rk.t3{color:var(--org)}.rk.t10{color:var(--gd)}
+        .rn-name{font-weight:600}.rn-cat{font-size:.68rem;color:var(--sub);margin-top:1px}
+        .rn-num{font-family:monospace;font-size:.78rem;text-align:right}
+        .rn-blog{color:var(--gd)}.rn-visit{color:var(--blue)}
+        .btn-add{padding:3px 9px;border:1.5px solid var(--g);color:var(--gd);background:#fff;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap}
+        .btn-add:hover:not(:disabled){background:var(--gb)}.btn-add:disabled{opacity:.5;cursor:not-allowed}
+
+        /* Dashboard */
+        .dash{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr)}
+        .dash-top{padding:12px 18px;border-bottom:1px solid var(--bdr);background:#fafbfc;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+        .dash-title{font-size:.9rem;font-weight:700}
+        .dash-cnt{font-size:.7rem;color:var(--sub);font-weight:400;margin-left:4px}
+        .dash-ctrl{display:flex;align-items:center;gap:6px}
+        .day-btn{padding:4px 12px;border:1.5px solid var(--bdr);background:#fff;border-radius:6px;font-size:.74rem;font-weight:600;cursor:pointer;color:var(--mut);transition:.12s}
+        .day-btn.on{background:var(--g);color:#fff;border-color:var(--g)}
+        .day-btn:not(.on):hover{border-color:var(--g);color:var(--gd)}
+        .btn-sm{padding:4px 9px;border:1.5px solid var(--bdr);background:#fff;border-radius:6px;font-size:.74rem;cursor:pointer;color:var(--mut)}
         .btn-sm:hover{border-color:var(--g);color:var(--gd)}
+
+        .empty{padding:46px;text-align:center;color:var(--sub)}
+        .empty p{font-size:.82rem;margin-top:8px;line-height:1.7}
+
+        /* Dashboard table */
         .dtw{overflow-x:auto}
         .dt{border-collapse:collapse;width:max-content;min-width:100%}
         .dt thead th,.dt tbody td{white-space:nowrap}
-        .rl-hdr{position:sticky;left:0;z-index:20;background:#f7fafc;padding:10px 14px;text-align:left;border-right:2px solid var(--bdr);border-bottom:2px solid var(--bdr);font-size:.7rem;font-weight:600;color:var(--mut);text-transform:uppercase;min-width:176px}
-        .dhdr{padding:8px 6px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;min-width:86px;text-align:center}
-        .dh-d{font-family:monospace;font-size:.78rem;font-weight:700;color:var(--txt)}
-        .dh-w{font-size:.65rem;color:var(--sub);margin-top:1px}
+
+        /* Group header row */
+        .grp-row td{background:linear-gradient(to right,#f0fff8,#f8fbff);padding:7px 16px;font-size:.76rem;font-weight:700;color:var(--gd);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12)}
+        .grp-cnt{font-size:.67rem;color:var(--sub);font-weight:400;margin-left:4px}
+
+        /* Sticky label column */
+        .rl-hdr{position:sticky;left:0;z-index:20;background:#f7fafc;padding:9px 14px;text-align:left;border-right:2px solid var(--bdr);border-bottom:2px solid var(--bdr);font-size:.67rem;font-weight:600;color:var(--mut);text-transform:uppercase;width:170px;min-width:170px}
+        .rl-cell{position:sticky;left:0;z-index:10;background:#fff;padding:7px 12px;border-right:2px solid var(--bdr);border-bottom:1px solid #f0f4f8;width:170px;min-width:170px}
+        .rl-cell:hover{background:#f8fffb}
+        .rl-inner{display:flex;align-items:center;gap:6px}
+        .rl-name{font-size:.81rem;font-weight:600;color:var(--txt);flex:1;overflow:hidden;text-overflow:ellipsis}
+        .rl-acts{display:flex;align-items:center;gap:4px;flex-shrink:0}
+        .rl-err{font-size:.62rem;color:var(--red)}
+        .spin-sm{width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;display:inline-block}
+        .btn-del{padding:2px 6px;border:1.5px solid #e2e8f0;color:var(--sub);background:#fff;border-radius:4px;font-size:.64rem;cursor:pointer}
+        .btn-del:hover{border-color:var(--red);color:var(--red)}
+
+        /* Date header */
+        .dhdr{padding:7px 2px;border-bottom:2px solid var(--bdr);border-right:1px solid #edf2f7;width:52px;min-width:52px;text-align:center}
+        .dh-d{font-family:monospace;font-size:.7rem;font-weight:700;color:var(--txt)}
+        .dh-w{font-size:.58rem;color:var(--sub);margin-top:1px}
         .dhdr.today{background:#f0fff8}.dhdr.today .dh-d{color:var(--gd)}
         .dhdr.sun .dh-d{color:var(--red)}.dhdr.sat .dh-d{color:var(--blue)}
-        .rl-cell{position:sticky;left:0;z-index:10;background:#fff;padding:10px 14px;border-right:2px solid var(--bdr);border-bottom:1px solid #f0f4f8;min-width:176px;max-width:200px;vertical-align:top}
-        .rl-cell:hover{background:#f8fffb}
-        .rl-q{font-size:.68rem;color:var(--sub);font-weight:500;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis}
-        .rl-p{font-size:.84rem;font-weight:700;color:var(--txt);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis}
-        .rl-extra{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-        .spin-row{display:flex;align-items:center;gap:5px;font-size:.67rem;color:var(--sub)}
-        .spin-sm{width:12px;height:12px;border:2px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
-        .rl-err{font-size:.67rem;color:var(--red)}
-        .btn-del{padding:2px 7px;border:1.5px solid #e2e8f0;color:var(--sub);background:#fff;border-radius:5px;font-size:.67rem;cursor:pointer;transition:.12s}
-        .btn-del:hover{border-color:var(--red);color:var(--red)}
-        .dc{padding:8px 6px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;vertical-align:middle;min-width:86px}
-        .dc-nil{color:#c8d6e0;font-size:.82rem;vertical-align:middle}
-        .rv{font-family:monospace;font-size:.88rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;margin:0 auto}
+
+        /* Data cell */
+        .dc{padding:5px 2px;border-right:1px solid #f0f4f8;border-bottom:1px solid #f0f4f8;text-align:center;width:52px;min-width:52px;vertical-align:middle}
+        .dc-nil{color:#cbd5e1;font-size:.76rem}
+        .rv{font-family:monospace;font-size:.76rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;margin:0 auto}
         .rv.r1{background:var(--gold);color:#5a3800}.rv.r3{background:var(--org);color:#fff}
         .rv.r10{background:var(--gb);color:var(--gd)}.rv.rn{background:#f0f4f8;color:var(--txt)}
-        .rc{font-size:.64rem;font-weight:700;display:block;margin-top:2px}
+        .rc{font-size:.58rem;font-weight:700;display:block;margin-top:2px}
         .rc-up{color:var(--red)}.rc-dn{color:var(--blue)}.rc-sm{color:var(--sub)}.rc-nw{color:var(--g)}
-        .cbl{font-size:.64rem;color:var(--gd);margin-top:4px}
-        .cvs{font-size:.64rem;color:var(--blue);margin-top:1px}
-        .empty-board{background:var(--surf);border-radius:var(--r);padding:52px;text-align:center;color:var(--sub);box-shadow:0 2px 14px rgba(0,0,0,.07)}
-        .empty-board .ico{font-size:2.2rem;margin-bottom:10px}
-        .empty-board p{font-size:.84rem;line-height:1.6}
-        .overlay{display:flex;position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-        .spin{width:46px;height:46px;border:4px solid #e0e0e0;border-top-color:var(--g);border-radius:50%;animation:spin .7s linear infinite}
-        .smsg{color:var(--mut);font-size:.88rem;text-align:center;line-height:1.6}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @media(max-width:640px){.regrow{grid-template-columns:1fr}}
-      `}</style>
 
-      {registering && (
-        <div className="overlay">
-          <div className="spin"/>
-          <div className="smsg">
-            수집 중... 잠시만 기다려주세요<br/>
-            <small style={{color:'var(--sub)',fontSize:'.76rem'}}>(최초 조회 시 30초~2분 소요)</small>
-          </div>
-        </div>
-      )}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @media(max-width:640px){.srow{grid-template-columns:1fr}}
+      `}</style>
 
       <header className="hdr">
         <h1>🏆 네이버 플레이스 순위 추적기</h1>
@@ -218,63 +316,150 @@ export default function Home() {
       </header>
 
       <div className="wrap">
-        <div className="regcard">
-          <div className="regrow">
+
+        {/* ── 검색 ───────────────────────────────────────────── */}
+        <div className="card">
+          <div className="card-title">🔍 순위 검색</div>
+          <div className="srow">
             <div className="fg">
               <label>검색어 (키워드)</label>
-              <input
-                value={regQuery}
-                onChange={e => setRegQuery(e.target.value)}
-                placeholder="예) 검단신도시미용실"
-                onKeyDown={e => e.key === 'Enter' && register()}
-                disabled={registering}
-              />
+              <input value={srchQ} onChange={e => setSrchQ(e.target.value)}
+                     placeholder="예) 검단신도시미용실"
+                     onKeyDown={e => e.key === 'Enter' && search()}
+                     disabled={searching} />
             </div>
             <div className="fg">
-              <label>상호명</label>
-              <input
-                value={regPlace}
-                onChange={e => setRegPlace(e.target.value)}
-                placeholder="예) 르아헤어"
-                onKeyDown={e => e.key === 'Enter' && register()}
-                disabled={registering}
-              />
+              <label>상호명<span className="hint-lbl">선택 · 비워두면 전체 순위 100위</span></label>
+              <input value={srchP} onChange={e => setSrchP(e.target.value)}
+                     placeholder="예) 르아헤어"
+                     onKeyDown={e => e.key === 'Enter' && search()}
+                     disabled={searching} />
             </div>
-            <button className="btn-main" onClick={register} disabled={registering}>
-              등록하기 →
+            <button className="btn-search" onClick={search} disabled={searching}>
+              {searching ? '검색 중...' : '검색하기 →'}
             </button>
           </div>
-          <p className="reghint">
-            ✓ 등록 후 삭제 전까지 계속 유지됩니다 · 최대 10개 ·
-            순위권에 없으면 등록되지 않습니다
-          </p>
+          {searching && (
+            <div className="srch-info">
+              <span className="srch-spin" />
+              수집 중... 최초 조회 시 30초~2분 소요될 수 있습니다.
+            </div>
+          )}
         </div>
 
-        {rows.length === 0 ? (
-          <div className="empty-board">
-            <div className="ico">📋</div>
-            <p>
-              등록된 항목이 없습니다.<br/>
-              위 폼에서 키워드와 상호명을 입력해 등록해주세요.
-            </p>
-          </div>
-        ) : (
-          <div className="board">
-            <div className="board-hdr">
-              <h2>
-                📊 순위 대시보드&nbsp;
-                <span style={{fontSize:'.7rem',color:'var(--sub)',fontWeight:400}}>
-                  {rows.length}개 등록
-                </span>
-              </h2>
-              <button className="btn-sm" onClick={loadAll}>↻ 새로고침</button>
+        {/* ── 단일 업체 결과 ──────────────────────────────────── */}
+        {single && !single.not_found && (
+          <div className="res-card">
+            <div className="res-top">
+              <div>
+                <div className="res-name">{single.matched_name}</div>
+                <div className="res-q">검색어: {doneQ}</div>
+              </div>
+              {isRegistered(doneQ, single.matched_name || doneP)
+                ? <span className="badge-reg">✓ 대시보드에 등록됨</span>
+                : <button className="btn-reg"
+                    onClick={() => registerItem(doneQ, doneP, single!.matched_name || null)}
+                    disabled={registering !== null}>
+                    {registering === mkKey(doneQ, doneP) ? '등록 중...' : '+ 대시보드에 등록'}
+                  </button>
+              }
             </div>
+            <div className="res-body">
+              <span className={`res-rank ${tCls(single.rank || 0)}`}>{single.rank}위</span>
+              {chgBadge(single.rank!, single.prev_rank)}
+              <div className="res-meta">
+                <span className="cnt cnt-blog">블로그 {(single.blog || 0).toLocaleString()}</span>
+                <span className="cnt cnt-visit">방문자 {(single.visit || 0).toLocaleString()}</span>
+                <span className="cnt cnt-time">{single.collected_at?.slice(0, 16)} 수집</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {single?.not_found && (
+          <div className="not-found">
+            &quot;{doneP}&quot;을(를) &quot;{doneQ}&quot; 검색결과 {single.total_collected}위 내에서 찾을 수 없습니다.
+          </div>
+        )}
+
+        {/* ── 전체 순위 목록 결과 ─────────────────────────────── */}
+        {listRes?.list && (
+          <div className="card">
+            <div className="list-header">
+              <h3>&quot;{doneQ}&quot; 전체 순위 — {listRes.list.length}개</h3>
+              <span className="list-time">{listRes.collected_at?.slice(0, 16)} 수집</span>
+            </div>
+            <div className="list-scroll">
+              <table className="rtable">
+                <thead>
+                  <tr>
+                    <th style={{ width: 44, textAlign: 'center' }}>순위</th>
+                    <th>상호명</th>
+                    <th style={{ width: 80, textAlign: 'right' }}>블로그</th>
+                    <th style={{ width: 80, textAlign: 'right' }}>방문자</th>
+                    <th style={{ width: 66, textAlign: 'center' }}>등록</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listRes.list.map(item => {
+                    const reg = isRegistered(doneQ, item.place_name)
+                    const key = mkKey(doneQ, item.place_name)
+                    return (
+                      <tr key={item.rank}>
+                        <td className={`rk ${tCls(item.rank)}`}>{item.rank}</td>
+                        <td>
+                          <div className="rn-name">{item.place_name}</div>
+                          {item.category && <div className="rn-cat">{item.category}</div>}
+                        </td>
+                        <td className="rn-num rn-blog">{(item.blog || 0).toLocaleString()}</td>
+                        <td className="rn-num rn-visit">{(item.visit || 0).toLocaleString()}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {reg
+                            ? <span className="badge badge-nw" style={{ fontSize: '.68rem' }}>✓ 등록됨</span>
+                            : <button className="btn-add"
+                                onClick={() => registerItem(doneQ, item.place_name, item.place_name)}
+                                disabled={registering !== null}>
+                                {registering === key ? '...' : '+등록'}
+                              </button>
+                          }
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── 대시보드 ────────────────────────────────────────── */}
+        <div className="dash">
+          <div className="dash-top">
+            <span className="dash-title">
+              📊 순위 대시보드
+              <span className="dash-cnt">{rows.length}개 등록</span>
+            </span>
+            <div className="dash-ctrl">
+              {([7, 14, 30] as const).map(d => (
+                <button key={d} className={`day-btn${dayFilter === d ? ' on' : ''}`}
+                  onClick={() => setDayFilter(d)}>{d}일</button>
+              ))}
+              <button className="btn-sm" onClick={loadDashboard} title="새로고침">↻</button>
+            </div>
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="empty">
+              <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>📋</div>
+              <p>등록된 항목이 없습니다.<br />위에서 검색 후 &quot;+ 대시보드에 등록&quot; 버튼으로 추가하세요.</p>
+            </div>
+          ) : (
             <div className="dtw">
               <table className="dt">
                 <thead>
                   <tr>
                     <th className="rl-hdr">키워드 / 업체명</th>
-                    {dates.map(d => {
+                    {visibleDates.map(d => {
                       const dt = new Date(d + 'T00:00:00')
                       const mm = String(dt.getMonth() + 1).padStart(2, '0')
                       const dd = String(dt.getDate()).padStart(2, '0')
@@ -289,29 +474,37 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(row => (
-                    <tr key={row.key}>
-                      <td className="rl-cell">
-                        <div className="rl-q">{row.search_query}</div>
-                        <div className="rl-p">{row.matched_name || row.place_name_input}</div>
-                        <div className="rl-extra">
-                          {row.loading
-                            ? <span className="spin-row"><span className="spin-sm"/><span>로딩중...</span></span>
-                            : row.error
-                              ? <span className="rl-err">{row.error}</span>
-                              : null
-                          }
-                          <button className="btn-del" onClick={() => del(row)}>✕ 삭제</button>
-                        </div>
-                      </td>
-                      {dates.map(d => renderCell(row, d))}
-                    </tr>
+                  {groups.map(([query, groupRows]) => (
+                    <Fragment key={`g-${query}`}>
+                      <tr className="grp-row">
+                        <td colSpan={visibleDates.length + 1}>
+                          🔑 {query}
+                          <span className="grp-cnt">({groupRows.length}개)</span>
+                        </td>
+                      </tr>
+                      {groupRows.map(row => (
+                        <tr key={row.key}>
+                          <td className="rl-cell">
+                            <div className="rl-inner">
+                              <span className="rl-name">{row.matched_name || row.place_name_input}</span>
+                              <div className="rl-acts">
+                                {row.loading && <span className="spin-sm" />}
+                                {row.error && <span className="rl-err">{row.error}</span>}
+                                <button className="btn-del" onClick={() => del(row)}>✕</button>
+                              </div>
+                            </div>
+                          </td>
+                          {visibleDates.map(d => renderCell(row, d))}
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
       </div>
     </>
   )
