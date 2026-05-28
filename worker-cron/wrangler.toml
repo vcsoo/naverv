@@ -1,4 +1,4 @@
-name = "naverv-daily-collector"
+name = "naverv-daily-trigger"
 main = "src/index.ts"
 compatibility_date = "2026-05-27"
 compatibility_flags = ["nodejs_compat"]
