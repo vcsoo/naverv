@@ -14,12 +14,12 @@ type Row = {
   error?: string
 }
 type SingleResult = {
-  matched_name?: string; rank?: number; prev_rank?: number | null
+  matched_name?: string; place_id?: string; rank?: number; prev_rank?: number | null
   blog?: number; visit?: number; collected_at?: string
   not_found?: boolean; total_collected?: number; history?: H[]
 }
 type ListItem = {
-  rank: number; place_name: string; category: string
+  rank: number; place_id?: string; place_name: string; category: string
   blog: number; visit: number; address: string
 }
 type ListResult = { list: ListItem[]; collected_at: string }
@@ -342,9 +342,17 @@ export default function Home() {
         .rtable tbody td{padding:8px 12px;vertical-align:middle}
         .rk{font-family:monospace;font-weight:700;text-align:center;font-size:.84rem}
         .rk.t1{color:var(--gold)}.rk.t3{color:var(--org)}.rk.t10{color:var(--gd)}
-        .rn-name{font-weight:600}.rn-cat{font-size:.68rem;color:var(--sub);margin-top:1px}
+        .rn-name{font-weight:600}
+        .rn-sub{display:flex;align-items:center;gap:6px;margin-top:1px;flex-wrap:wrap}
+        .rn-cat{font-size:.68rem;color:var(--sub)}
+        .rn-pid{font-size:.62rem;color:var(--blue);font-family:monospace;text-decoration:none;opacity:.7;white-space:nowrap}
+        .rn-pid:hover{opacity:1;text-decoration:underline}
         .rn-num{font-family:monospace;font-size:.78rem;text-align:right}
         .rn-blog{color:var(--gd)}.rn-visit{color:var(--blue)}
+        .place-id-row{display:flex;align-items:center;gap:6px;margin-top:6px;width:100%;flex-basis:100%}
+        .place-id-lbl{font-size:.68rem;color:var(--sub);font-weight:600;white-space:nowrap}
+        .place-id-val{font-size:.72rem;font-family:monospace;color:var(--blue);text-decoration:none}
+        .place-id-val:hover{text-decoration:underline}
         .btn-add{padding:3px 9px;border:1.5px solid var(--g);color:var(--gd);background:#fff;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;white-space:nowrap}
         .btn-add:hover:not(:disabled){background:var(--gb)}.btn-add:disabled{opacity:.5;cursor:not-allowed}
 
@@ -432,25 +440,64 @@ export default function Home() {
         .mob-chg{font-size:.58rem;font-weight:700}
         .crd-nodata{font-size:.76rem;color:var(--sub);text-align:center;padding:10px 0}
 
+        /* 스크롤 힌트 (모바일 표 뷰) */
+        .scroll-hint{display:none;align-items:center;justify-content:center;gap:6px;padding:7px 14px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:.72rem;color:#92400e}
+        .scroll-hint-icon{font-size:.9rem}
+
         @keyframes spin{to{transform:rotate(360deg)}}
 
-        /* 모바일 반응형 */
+        /* ── 모바일 반응형 (640px 이하) ── */
         @media(max-width:640px){
-          .srow{grid-template-columns:1fr}
-          .wrap{padding:12px 10px;gap:12px}
-          .card{padding:14px 14px}
-          /* 표 뷰: 업체명 컬럼 + 날짜 컬럼 축소 */
-          .rl-hdr{width:100px;min-width:100px;padding:7px 8px;font-size:.6rem}
-          .rl-cell{width:100px;min-width:100px;padding:6px 6px}
+          /* 레이아웃 */
+          .wrap{padding:10px 10px;gap:10px}
+          .card{padding:14px 12px}
+          .hdr{padding:12px 16px}
+          .hdr h1{font-size:1rem}
+
+          /* 검색폼 */
+          .srow{grid-template-columns:1fr;gap:8px}
+          .btn-search{width:100%;height:48px;font-size:.92rem;border-radius:10px}
+          .fg input{height:46px;font-size:.9rem}
+
+          /* 대시보드 헤더: 타이틀 위, 컨트롤 아래 */
+          .dash-top{flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px}
+          .dash-ctrl{justify-content:space-between;gap:4px}
+          .view-btn{flex:1;text-align:center;padding:8px 4px;font-size:.76rem;min-height:36px}
+          .day-btn{flex:1;text-align:center;padding:7px 4px;font-size:.74rem;min-height:36px}
+          .btn-sm{padding:8px 10px;min-height:36px}
+          .sep{display:none}
+
+          /* 날짜 탭 바 */
+          .date-tab{padding:7px 14px;font-size:.76rem;min-height:36px}
+
+          /* 카드: 더 크고 읽기 쉽게 */
+          .card-groups{padding:10px 12px;gap:10px}
+          .crd{padding:14px 12px}
+          .crd-name{font-size:.95rem}
+          .crd-rank{font-size:2rem}
+          .crd-val{font-size:.88rem}
+          .crd-cnt{font-size:.82rem;gap:5px}
+          .crd-lbl{font-size:.72rem}
+          .crd-main{gap:16px;margin-bottom:12px}
+          .mob-rv{width:34px;height:34px;font-size:.78rem}
+          .crd-day{padding:4px 5px}
+          .crd-day-lbl{font-size:.62rem}
+          .mob-chg{font-size:.62rem}
+          .btn-del{padding:5px 9px;font-size:.7rem;min-height:32px}
+
+          /* 표 뷰: 컬럼 최소화 + 스크롤 힌트 표시 */
+          .scroll-hint{display:flex}
+          .rl-hdr{width:90px;min-width:90px;padding:7px 8px;font-size:.6rem}
+          .rl-cell{width:90px;min-width:90px;padding:6px 6px}
           .rl-name{font-size:.7rem}
-          .dhdr{width:62px;min-width:62px;padding:5px 1px}
+          .dhdr{width:58px;min-width:58px;padding:5px 1px}
           .dh-d{font-size:.6rem}
           .dh-w{font-size:.5rem}
-          .dc{width:62px;min-width:62px;padding:4px 1px}
-          .rv{width:24px;height:24px;font-size:.64rem}
-          .dc-num{font-size:.55rem}
+          .dc{width:58px;min-width:58px;padding:4px 1px}
+          .rv{width:22px;height:22px;font-size:.62rem}
+          .dc-num{font-size:.54rem}
           .dc-lbl{font-size:.5rem}
-          .rc{font-size:.52rem}
+          .rc{font-size:.5rem}
         }
       `}</style>
 
@@ -472,9 +519,9 @@ export default function Home() {
                      disabled={searching} />
             </div>
             <div className="fg">
-              <label>상호명<span className="hint-lbl">선택 · 비워두면 전체 순위 100위</span></label>
+              <label>상호명 또는 플레이스 ID<span className="hint-lbl">선택 · 비워두면 전체 100위</span></label>
               <input value={srchP} onChange={e => setSrchP(e.target.value)}
-                     placeholder="예) 르아헤어"
+                     placeholder="예) 르아헤어  또는  1234567890"
                      onKeyDown={e => e.key === 'Enter' && search()}
                      disabled={searching} />
             </div>
@@ -515,6 +562,16 @@ export default function Home() {
                 <span className="cnt cnt-visit">방문자 {(single.visit || 0).toLocaleString()}</span>
                 <span className="cnt cnt-time">{single.collected_at?.slice(0, 16)} 수집</span>
               </div>
+              {single.place_id && (
+                <div className="place-id-row">
+                  <span className="place-id-lbl">플레이스 ID</span>
+                  <a className="place-id-val"
+                     href={`https://m.place.naver.com/place/${single.place_id}/home`}
+                     target="_blank" rel="noopener noreferrer">
+                    {single.place_id} ↗
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -552,7 +609,17 @@ export default function Home() {
                         <td className={`rk ${tCls(item.rank)}`}>{item.rank}</td>
                         <td>
                           <div className="rn-name">{item.place_name}</div>
-                          {item.category && <div className="rn-cat">{item.category}</div>}
+                          <div className="rn-sub">
+                            {item.category && <span className="rn-cat">{item.category}</span>}
+                            {item.place_id && (
+                              <a className="rn-pid"
+                                 href={`https://m.place.naver.com/place/${item.place_id}/home`}
+                                 target="_blank" rel="noopener noreferrer"
+                                 onClick={e => e.stopPropagation()}>
+                                ID:{item.place_id}
+                              </a>
+                            )}
+                          </div>
                         </td>
                         <td className="rn-num rn-blog">{(item.blog || 0).toLocaleString()}</td>
                         <td className="rn-num rn-visit">{(item.visit || 0).toLocaleString()}</td>
@@ -633,6 +700,12 @@ export default function Home() {
             </div>
           ) : (
             /* ── 표 뷰 ── */
+            <>
+            <div className="scroll-hint">
+              <span className="scroll-hint-icon">👈</span>
+              좌우로 스크롤하세요
+              <span className="scroll-hint-icon">👉</span>
+            </div>
             <div className="dtw">
               <table className="dt">
                 <thead>
@@ -681,6 +754,7 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 

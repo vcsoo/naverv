@@ -50,6 +50,7 @@ export async function GET(request: Request) {
 
     return Response.json({
       matched_name: found.matched.name,
+      place_id: found.matched.place_id,
       rank: found.matched.rank,
       prev_rank,
       blog: found.matched.blog,

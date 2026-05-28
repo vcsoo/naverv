@@ -201,7 +201,16 @@ export function normalizeName(value: string): string {
 }
 
 export function matchPlace(places: NaverPlace[], input: string): NaverPlace | null {
-  const key = normalizeName(input)
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  // 숫자로만 이루어진 입력 → 플레이스 ID 직접 매칭
+  if (/^\d+$/.test(trimmed)) {
+    const byId = places.find((p) => p.place_id === trimmed)
+    if (byId) return byId
+  }
+
+  const key = normalizeName(trimmed)
   if (!key) return null
   return (
     places.find((p) => normalizeName(p.name) === key) ||

@@ -28,6 +28,7 @@ export function getDummySingle(todayKst: string) {
   const prev = history[history.length - 2]
   return {
     matched_name: DUMMY_PLACE,
+    place_id: '99999999',
     rank: last.rank,
     prev_rank: prev.rank,
     blog: last.blog,
@@ -43,11 +44,11 @@ export function getDummyList(todayKst: string) {
   return {
     collected_at: todayKst + 'T11:30:00',
     list: [
-      { rank: 1,          place_name: '1위샘플업체',  category: '미용실', blog: 2500, visit: 8200, address: '인천광역시 서구 샘플로 1' },
-      { rank: 2,          place_name: '2위샘플업체',  category: '미용실', blog: 2100, visit: 7100, address: '인천광역시 서구 샘플로 2' },
-      { rank: last.rank,  place_name: DUMMY_PLACE,    category: '테스트업체', blog: last.blog, visit: last.visit, address: '인천광역시 서구 테스트로 123' },
-      { rank: last.rank + 1, place_name: '기타업체A', category: '미용실', blog: 980,  visit: 3200, address: '' },
-      { rank: last.rank + 2, place_name: '기타업체B', category: '미용실', blog: 870,  visit: 2900, address: '' },
+      { rank: 1,          place_id: '11111111', place_name: '1위샘플업체',  category: '미용실', blog: 2500, visit: 8200, address: '인천광역시 서구 샘플로 1' },
+      { rank: 2,          place_id: '22222222', place_name: '2위샘플업체',  category: '미용실', blog: 2100, visit: 7100, address: '인천광역시 서구 샘플로 2' },
+      { rank: last.rank,  place_id: '99999999', place_name: DUMMY_PLACE,    category: '테스트업체', blog: last.blog, visit: last.visit, address: '인천광역시 서구 테스트로 123' },
+      { rank: last.rank + 1, place_id: '33333333', place_name: '기타업체A', category: '미용실', blog: 980,  visit: 3200, address: '' },
+      { rank: last.rank + 2, place_id: '44444444', place_name: '기타업체B', category: '미용실', blog: 870,  visit: 2900, address: '' },
     ].sort((a, b) => a.rank - b.rank),
   }
 }
