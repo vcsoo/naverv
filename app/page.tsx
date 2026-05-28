@@ -38,12 +38,13 @@ export default function Home() {
   const [dayFilter, setDayFilter] = useState<7 | 14 | 30>(7)
   const [cardDate, setCardDate] = useState<string>('')
   const [registering, setRegistering] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  // 모바일 기본 카드, 데스크톱은 effect에서 표로 전환 → 초기 렌더에서 table 안 그림
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('card')
 
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })
 
   useEffect(() => { loadDashboard() }, [])
-  useEffect(() => { if (window.innerWidth < 700) setViewMode('card') }, [])
+  useEffect(() => { if (window.innerWidth >= 700) setViewMode('table') }, [])
 
   const mkKey = (sq: string, pi: string) => `${sq}||${pi}`
   const rCls  = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
@@ -248,26 +249,28 @@ export default function Home() {
             {/* 최근 7일 미니 순위 (선택 날짜 하이라이트) */}
             {last7.length > 1 && (
               <div className="crd-hist">
-                {last7.map((hh, i) => {
-                  const dt = new Date(hh.date + 'T00:00:00')
-                  const mm = String(dt.getMonth() + 1).padStart(2, '0')
-                  const dd = String(dt.getDate()).padStart(2, '0')
-                  const prevH = i > 0 ? last7[i - 1] : null
-                  const rd = prevH ? prevH.rank - hh.rank : null
-                  const isSel = hh.date === selDate
-                  return (
-                    <div key={hh.date}
-                      className={`crd-day${isSel ? ' crd-sel' : ''}`}
-                      onClick={() => setCardDate(hh.date)}
-                      style={{ cursor: 'pointer' }}>
-                      <div className="crd-day-lbl">{hh.date === today ? '오늘' : `${mm}.${dd}`}</div>
-                      <div className={`mob-rv ${rCls(hh.rank)}`}>{hh.rank}</div>
-                      <div className={`mob-chg ${rd === null ? 'rc-nw' : rd > 0 ? 'rc-up' : rd < 0 ? 'rc-dn' : 'rc-sm'}`}>
-                        {rd === null ? 'N' : rd > 0 ? `▲${rd}` : rd < 0 ? `▼${Math.abs(rd)}` : '━'}
+                <div className="crd-hist-inner">
+                  {last7.map((hh, i) => {
+                    const dt = new Date(hh.date + 'T00:00:00')
+                    const mm = String(dt.getMonth() + 1).padStart(2, '0')
+                    const dd = String(dt.getDate()).padStart(2, '0')
+                    const prevH = i > 0 ? last7[i - 1] : null
+                    const rd = prevH ? prevH.rank - hh.rank : null
+                    const isSel = hh.date === selDate
+                    return (
+                      <div key={hh.date}
+                        className={`crd-day${isSel ? ' crd-sel' : ''}`}
+                        onClick={() => setCardDate(hh.date)}
+                        style={{ cursor: 'pointer' }}>
+                        <div className="crd-day-lbl">{hh.date === today ? '오늘' : `${mm}.${dd}`}</div>
+                        <div className={`mob-rv ${rCls(hh.rank)}`}>{hh.rank}</div>
+                        <div className={`mob-chg ${rd === null ? 'rc-nw' : rd > 0 ? 'rc-up' : rd < 0 ? 'rc-dn' : 'rc-sm'}`}>
+                          {rd === null ? 'N' : rd > 0 ? `▲${rd}` : rd < 0 ? `▼${Math.abs(rd)}` : '━'}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )}
           </>
@@ -299,6 +302,7 @@ export default function Home() {
         .hdr p{color:rgba(255,255,255,.75);font-size:.7rem;margin-top:2px}
 
         .wrap{max-width:1400px;margin:0 auto;padding:18px 16px;display:flex;flex-direction:column;gap:16px;overflow-x:hidden}
+        .wrap>*{min-width:0}
         .card{background:var(--surf);border-radius:var(--r);padding:18px 22px;box-shadow:0 2px 12px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.05)}
         .card-title{font-size:.9rem;font-weight:700;margin-bottom:14px}
 
@@ -358,7 +362,7 @@ export default function Home() {
         .btn-add:hover:not(:disabled){background:var(--gb)}.btn-add:disabled{opacity:.5;cursor:not-allowed}
 
         /* 대시보드 공통 */
-        .dash{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr)}
+        .dash{background:var(--surf);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;border:1px solid var(--bdr);min-width:0;width:100%}
         .dash-top{padding:12px 18px;border-bottom:1px solid var(--bdr);background:#fafbfc;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
         .dash-title{font-size:.9rem;font-weight:700}
         .dash-cnt{font-size:.7rem;color:var(--sub);font-weight:400;margin-left:4px}
@@ -370,10 +374,11 @@ export default function Home() {
         .empty{padding:46px;text-align:center;color:var(--sub)}
         .empty p{font-size:.82rem;margin-top:8px;line-height:1.7}
 
-        /* 카드 뷰 날짜 탭 바 */
-        .dash-date-bar{display:flex;gap:5px;padding:8px 14px;overflow-x:auto;border-bottom:1px solid var(--bdr);background:#f7faf7;-webkit-overflow-scrolling:touch;width:100%;min-width:0}
+        /* 카드 뷰 날짜 탭 바 — block 외부 + flex 내부(분리) */
+        .dash-date-bar{display:block;overflow-x:auto;overflow-y:hidden;border-bottom:1px solid var(--bdr);background:#f7faf7;-webkit-overflow-scrolling:touch}
         .dash-date-bar::-webkit-scrollbar{height:3px}
         .dash-date-bar::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+        .dash-date-inner{display:flex;gap:5px;padding:8px 14px;width:max-content}
         .date-tab{padding:4px 11px;border:1.5px solid var(--bdr);background:#fff;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--mut);white-space:nowrap;flex-shrink:0;transition:.12s}
         .date-tab.on{background:var(--g);color:#fff;border-color:var(--g)}
         .date-tab:not(.on):hover{border-color:var(--g);color:var(--gd)}
@@ -429,7 +434,9 @@ export default function Home() {
         .crd-lbl{color:var(--sub);font-weight:700;font-size:.68rem;width:10px;flex-shrink:0}
         .crd-val{font-family:monospace;font-weight:600}
         .crd-val.blog{color:var(--gd)}.crd-val.visit{color:var(--blue)}
-        .crd-hist{display:flex;gap:6px;padding-top:8px;border-top:1px solid #f0f4f8;overflow-x:auto;min-width:0;max-width:100%}
+        /* crd-hist — block 외부 + flex 내부(분리) */
+        .crd-hist{display:block;overflow-x:auto;overflow-y:hidden;padding-top:8px;border-top:1px solid #f0f4f8;-webkit-overflow-scrolling:touch}
+        .crd-hist-inner{display:flex;gap:6px;width:max-content}
         .crd-day{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;padding:3px 4px;border-radius:6px;transition:.12s}
         .crd-day:hover{background:rgba(3,199,90,.08)}
         .crd-day.crd-sel .crd-day-lbl{color:var(--gd);font-weight:700}
@@ -674,13 +681,15 @@ export default function Home() {
           {/* 카드 뷰: 날짜 선택 바 */}
           {viewMode === 'card' && dates.length > 0 && (
             <div className="dash-date-bar">
-              {dates.slice(0, 14).map(d => (
-                <button key={d}
-                  className={`date-tab${cardDate === d ? ' on' : ''}`}
-                  onClick={() => setCardDate(d)}>
-                  {fmtDate(d)}
-                </button>
-              ))}
+              <div className="dash-date-inner">
+                {dates.slice(0, 14).map(d => (
+                  <button key={d}
+                    className={`date-tab${cardDate === d ? ' on' : ''}`}
+                    onClick={() => setCardDate(d)}>
+                    {fmtDate(d)}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
