@@ -1,6 +1,7 @@
 name = "naverv-daily-collector"
-main = "index.ts"
+main = "src/index.ts"
 compatibility_date = "2026-05-27"
+compatibility_flags = ["nodejs_compat"]
 
 [triggers]
 crons = ["30 2 * * *"]
