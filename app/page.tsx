@@ -291,13 +291,14 @@ export default function Home() {
       <style>{`
         :root{--g:#03c75a;--gd:#00a045;--gb:#e8faf1;--blue:#1967d2;--red:#e8192c;--org:#ff9500;--gold:#e6aa00;--bg:#f0f4f8;--surf:#fff;--bdr:#e2e8f0;--txt:#1a2332;--mut:#64748b;--sub:#94a3b8;--r:12px}
         *{box-sizing:border-box;margin:0;padding:0}
+        html,body{overflow-x:hidden;max-width:100%}
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
 
         .hdr{background:linear-gradient(135deg,#03c75a,#00b44a 45%,#0597d8);padding:14px 24px;position:sticky;top:0;z-index:200}
         .hdr h1{color:#fff;font-size:1.05rem;font-weight:700}
         .hdr p{color:rgba(255,255,255,.75);font-size:.7rem;margin-top:2px}
 
-        .wrap{max-width:1400px;margin:0 auto;padding:18px 16px;display:flex;flex-direction:column;gap:16px}
+        .wrap{max-width:1400px;margin:0 auto;padding:18px 16px;display:flex;flex-direction:column;gap:16px;overflow-x:hidden}
         .card{background:var(--surf);border-radius:var(--r);padding:18px 22px;box-shadow:0 2px 12px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.05)}
         .card-title{font-size:.9rem;font-weight:700;margin-bottom:14px}
 
@@ -370,7 +371,7 @@ export default function Home() {
         .empty p{font-size:.82rem;margin-top:8px;line-height:1.7}
 
         /* 카드 뷰 날짜 탭 바 */
-        .dash-date-bar{display:flex;gap:5px;padding:8px 14px;overflow-x:auto;border-bottom:1px solid var(--bdr);background:#f7faf7;-webkit-overflow-scrolling:touch}
+        .dash-date-bar{display:flex;gap:5px;padding:8px 14px;overflow-x:auto;border-bottom:1px solid var(--bdr);background:#f7faf7;-webkit-overflow-scrolling:touch;width:100%;min-width:0}
         .dash-date-bar::-webkit-scrollbar{height:3px}
         .dash-date-bar::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
         .date-tab{padding:4px 11px;border:1.5px solid var(--bdr);background:#fff;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--mut);white-space:nowrap;flex-shrink:0;transition:.12s}
@@ -378,7 +379,7 @@ export default function Home() {
         .date-tab:not(.on):hover{border-color:var(--g);color:var(--gd)}
 
         /* ── 표 뷰 ── */
-        .dtw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+        .dtw{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0}
         .dt{border-collapse:collapse;width:max-content;min-width:100%}
         .dt thead th,.dt tbody td{white-space:nowrap}
         .grp-row td{background:linear-gradient(to right,#f0fff8,#f8fbff);padding:7px 16px;font-size:.76rem;font-weight:700;color:var(--gd);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12)}
@@ -428,7 +429,7 @@ export default function Home() {
         .crd-lbl{color:var(--sub);font-weight:700;font-size:.68rem;width:10px;flex-shrink:0}
         .crd-val{font-family:monospace;font-weight:600}
         .crd-val.blog{color:var(--gd)}.crd-val.visit{color:var(--blue)}
-        .crd-hist{display:flex;gap:6px;padding-top:8px;border-top:1px solid #f0f4f8;overflow-x:auto}
+        .crd-hist{display:flex;gap:6px;padding-top:8px;border-top:1px solid #f0f4f8;overflow-x:auto;min-width:0;max-width:100%}
         .crd-day{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;padding:3px 4px;border-radius:6px;transition:.12s}
         .crd-day:hover{background:rgba(3,199,90,.08)}
         .crd-day.crd-sel .crd-day-lbl{color:var(--gd);font-weight:700}
@@ -461,10 +462,10 @@ export default function Home() {
 
           /* 대시보드 헤더: 타이틀 위, 컨트롤 아래 */
           .dash-top{flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px}
-          .dash-ctrl{justify-content:space-between;gap:4px}
-          .view-btn{flex:1;text-align:center;padding:8px 4px;font-size:.76rem;min-height:36px}
-          .day-btn{flex:1;text-align:center;padding:7px 4px;font-size:.74rem;min-height:36px}
-          .btn-sm{padding:8px 10px;min-height:36px}
+          .dash-ctrl{justify-content:flex-start;gap:6px;flex-wrap:wrap;max-width:100%;min-width:0}
+          .view-btn{flex:none;padding:8px 14px;font-size:.76rem;min-height:36px}
+          .day-btn{flex:none;padding:7px 10px;font-size:.74rem;min-height:36px}
+          .btn-sm{padding:8px 10px;min-height:36px;margin-left:auto}
           .sep{display:none}
 
           /* 날짜 탭 바 */
