@@ -22,27 +22,29 @@ export default function Home() {
     setTargets(await r.json())
   }
 
-  async function doSearch(retry=0) {
-    if (!query.trim()) { alert('검색어를 입력해주세요'); return }
-    setCurQ(query); setCurP(place)
-    setLoading(true)
-    if (place.trim()) await doPlace(query, place, retry)
-    else await doRanking(query, retry)
-    setLoading(false)
-  }
+async function doSearch() {
+  if (!query.trim()) { alert('검색어를 입력해주세요'); return }
+  setCurQ(query); setCurP(place)
+  setLoading(true)
+  if (place.trim()) await doPlace(query, place)
+  else await doRanking(query)
+  setLoading(false)
+}
 
-  async function doPlace(q: string, p: string, retry=0) {
-    setLoadingMsg('순위 확인 중...')
-    const res = await fetch('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({search_query:q, place_name:p}) })
-    const data = await res.json()
-    if (data.need_collect) {
-      if (retry >= 1) { alert('수집된 데이터가 없습니다. PC 수집기를 먼저 실행해주세요.'); return }
-      await new Promise(r => setTimeout(r, 2000))
-      return doPlace(q, p, retry+1)
-    }
-    setRankList(null); setResult(data); loadTargets()
-  }
+async function doPlace(q: string, p: string) {
+  setLoadingMsg('수집 중... (최초 조회 시 30초~2분 소요)')
+  const res = await fetch('/api/search', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({search_query:q, place_name:p}) })
+  const data = await res.json()
+  setRankList(null); setResult(data); loadTargets()
+}
 
+async function doRanking(q: string) {
+  setLoadingMsg('수집 중... (최초 조회 시 30초~2분 소요)')
+  const res = await fetch('/api/ranking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({search_query:q, limit:100}) })
+  const data = await res.json()
+  setResult(null); setRankList(data.list); setRankMeta({query:q, collected_at:data.collected_at})
+}
+  
   async function doRanking(q: string, retry=0) {
     setLoadingMsg('전체 순위 조회 중...')
     const res = await fetch('/api/ranking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({search_query:q, limit:100}) })
