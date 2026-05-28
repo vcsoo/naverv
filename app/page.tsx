@@ -387,7 +387,8 @@ export default function Home() {
         .dtw{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0}
         .dt{border-collapse:collapse;width:max-content;min-width:100%}
         .dt thead th,.dt tbody td{white-space:nowrap}
-        .grp-row td{background:linear-gradient(to right,#f0fff8,#f8fbff);padding:7px 16px;font-size:.76rem;font-weight:700;color:var(--gd);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12)}
+        .grp-hdr-cell{position:sticky;left:0;z-index:15;background:linear-gradient(to right,#e8faf1,#f0fff8);padding:7px 14px;font-size:.76rem;font-weight:700;color:var(--gd);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12);white-space:nowrap}
+        .grp-fill{background:linear-gradient(to right,#f4fdf8,#f8fbff);border-top:2px solid rgba(3,199,90,.2);border-bottom:1px solid rgba(3,199,90,.12)}
         .grp-cnt{font-size:.67rem;color:var(--sub);font-weight:400;margin-left:4px}
         .rl-hdr{position:sticky;left:0;z-index:20;background:#f7fafc;padding:9px 14px;text-align:left;border-right:2px solid var(--bdr);border-bottom:2px solid var(--bdr);font-size:.67rem;font-weight:600;color:var(--mut);text-transform:uppercase;width:140px;min-width:140px}
         .rl-cell{position:sticky;left:0;z-index:10;background:#fff;padding:7px 10px;border-right:2px solid var(--bdr);border-bottom:1px solid #f0f4f8;width:140px;min-width:140px}
@@ -739,10 +740,11 @@ export default function Home() {
                   {groups.map(([query, groupRows]) => (
                     <Fragment key={`g-${query}`}>
                       <tr className="grp-row">
-                        <td colSpan={visibleDates.length + 1}>
+                        <td className="grp-hdr-cell">
                           🔑 {query}
                           <span className="grp-cnt">({groupRows.length}개)</span>
                         </td>
+                        {visibleDates.map(d => <td key={d} className="grp-fill" />)}
                       </tr>
                       {groupRows.map(row => (
                         <tr key={row.key}>
