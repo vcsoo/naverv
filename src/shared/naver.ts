@@ -216,7 +216,18 @@ export async function collectNaverPlaces(query: string, limit = 75): Promise<Nav
     places.push(place)
     if (places.length >= limit) break
   }
-  return await enrichReviewCounts(places)
+  return places
+}
+
+/** 지정한 place_id 목록만 상세 페이지에서 리뷰 수 보강 */
+export async function enrichPlaces(places: NaverPlace[], placeIds: string[]): Promise<NaverPlace[]> {
+  if (!placeIds.length) return places
+  const idSet = new Set(placeIds)
+  const toEnrich = places.filter(p => idSet.has(p.place_id))
+  if (!toEnrich.length) return places
+  const enriched = await enrichReviewCounts(toEnrich)
+  const enrichedMap = new Map(enriched.map(p => [p.place_id, p]))
+  return places.map(p => enrichedMap.get(p.place_id) ?? p)
 }
 
 export function normalizeName(value: string): string {

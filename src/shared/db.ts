@@ -1,4 +1,4 @@
-import { collectNaverPlaces, kstDateString, kstNowString, matchPlace, normalizeName, type NaverPlace } from './naver'
+import { collectNaverPlaces, enrichPlaces, kstDateString, kstNowString, matchPlace, normalizeName, type NaverPlace } from './naver'
 
 export type Env = {
   DB: D1Database
@@ -17,7 +17,23 @@ type D1PreparedStatement = {
 }
 
 export async function collectAndStore(db: D1Database, query: string, limit = 75) {
-  const places = await collectNaverPlaces(query, limit)
+  const rawPlaces = await collectNaverPlaces(query, limit)
+
+  // 추적 중인 타겟만 상세 페이지에서 리뷰 수 보강 (전체 fetch 시 Naver 봇 차단 방지)
+  const { results: targetRows } = await db
+    .prepare('SELECT matched_name, place_name_input FROM targets WHERE search_query = ?')
+    .bind(query)
+    .all<{ matched_name: string | null; place_name_input: string }>()
+
+  const targetPlaceIds: string[] = []
+  for (const t of targetRows) {
+    const matched = matchPlace(rawPlaces, t.matched_name || t.place_name_input)
+    if (matched && !targetPlaceIds.includes(matched.place_id)) {
+      targetPlaceIds.push(matched.place_id)
+    }
+  }
+  const places = await enrichPlaces(rawPlaces, targetPlaceIds)
+
   const collectedAt = kstNowString()
   const date = collectedAt.slice(0, 10)
 
