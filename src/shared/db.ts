@@ -16,7 +16,7 @@ type D1PreparedStatement = {
   run(): Promise<unknown>
 }
 
-export async function collectAndStore(db: D1Database, query: string, limit = 75) {
+export async function collectAndStore(db: D1Database, query: string, limit = 100) {
   const rawPlaces = await collectNaverPlaces(query, limit)
 
   // 추적 중인 타겟만 상세 페이지에서 리뷰 수 보강 (전체 fetch 시 Naver 봇 차단 방지)
@@ -79,7 +79,7 @@ export async function latestCollectedAt(db: D1Database, query: string): Promise<
   return row?.collected_at || null
 }
 
-export async function ensureRanking(db: D1Database, query: string, limit = 75) {
+export async function ensureRanking(db: D1Database, query: string, limit = 100) {
   const latest = await latestCollectedAt(db, query)
   if (latest && latest.slice(0, 10) === kstDateString()) return { collected_at: latest, collected: false }
   const run = await collectAndStore(db, query, limit)

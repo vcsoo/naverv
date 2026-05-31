@@ -197,7 +197,7 @@ async function enrichReviewCounts(places: NaverPlace[], concurrency = 6): Promis
   return out
 }
 
-export async function collectNaverPlaces(query: string, limit = 75): Promise<NaverPlace[]> {
+export async function collectNaverPlaces(query: string, limit = 100): Promise<NaverPlace[]> {
   const url = `https://m.map.naver.com/search?query=${encodeURIComponent(query)}`
   const html = await fetchText(url, 'https://m.map.naver.com/')
   const blocks = findItemBlocks(parseStreamingState(html))
