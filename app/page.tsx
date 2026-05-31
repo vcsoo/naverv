@@ -112,12 +112,19 @@ export default function Home() {
     if (!confirm('등록된 모든 키워드의 오늘 데이터를 새로 수집합니다.\n30초~수 분 소요될 수 있습니다. 계속하시겠습니까?')) return
     setRecollecting(true)
     try {
-      const r = await fetch('/api/cron', { method: 'POST' })
-      const data = await r.json() as any
-      if (!r.ok) { alert(data?.error || '재수집 실패'); return }
+      const r = await fetch('/api/recollect', { method: 'POST' })
+      let data: any = null
+      try { data = await r.json() } catch { /* non-JSON response */ }
+      if (!r.ok) {
+        alert(`재수집 실패 (${r.status})\n${data?.error || r.statusText || '알 수 없는 오류'}`)
+        return
+      }
       await loadDashboard()
-    } catch { alert('재수집 중 오류가 발생했습니다.') }
-    finally { setRecollecting(false) }
+    } catch (e: any) {
+      alert(`재수집 중 오류\n${e?.message || String(e)}`)
+    } finally {
+      setRecollecting(false)
+    }
   }
 
   async function search() {
