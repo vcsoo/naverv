@@ -7,6 +7,7 @@ export const config = {
 
 export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/api/auth')) return NextResponse.next()
+  if (request.nextUrl.pathname === '/api/init') return NextResponse.next()
 
   const token = request.cookies.get('session')?.value
   if (token) {
