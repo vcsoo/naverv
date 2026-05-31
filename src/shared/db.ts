@@ -160,13 +160,37 @@ export async function listActiveTargets(db: D1Database) {
   return results
 }
 
+export async function findPlaceInHistory(db: D1Database, query: string, placeName: string): Promise<NaverPlace | null> {
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT place_id, place_name
+       FROM rankings
+       WHERE search_query = ?
+       LIMIT 500`,
+    )
+    .bind(query)
+    .all<any>()
+
+  const candidates: NaverPlace[] = results.map((r: any) => ({
+    rank: 0,
+    place_id: String(r.place_id ?? ''),
+    name: r.place_name,
+    address: '',
+    category: '',
+    blog: 0,
+    visit: 0,
+  }))
+
+  return matchPlace(candidates, placeName)
+}
+
 export async function collectActiveTargets(db: D1Database) {
   const targets = await listActiveTargets(db)
   const uniqueQueries = Array.from(new Set(targets.map((t: any) => t.search_query)))
   const results = []
   for (const query of uniqueQueries) {
     try {
-      results.push(await collectAndStore(db, query, 75))
+      results.push(await collectAndStore(db, query, 100))
     } catch (e: any) {
       results.push({ query, error: e?.message || String(e) })
     }

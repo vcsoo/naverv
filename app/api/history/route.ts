@@ -1,5 +1,5 @@
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { findPlaceInLatest, getPlaceHistory } from '../../../src/shared/db'
+import { findPlaceInLatest, findPlaceInHistory, getPlaceHistory } from '../../../src/shared/db'
 import { isDummy, getDummyHistory } from '../../../src/shared/dummy'
 
 export const runtime = 'edge'
@@ -32,17 +32,23 @@ export async function GET(request: Request) {
     const db = (env as any).DB
 
     const found = await findPlaceInLatest(db, query, place)
-    if (!found?.matched) {
+    const matched = found?.matched ?? await findPlaceInHistory(db, query, place)
+
+    if (!matched) {
       return Response.json({ not_found: true, history: [] })
     }
 
-    const history = await getPlaceHistory(db, query, found.matched)
+    const history = await getPlaceHistory(db, query, matched)
+    if (!history.length) {
+      return Response.json({ not_found: true, history: [] })
+    }
+
     return Response.json({
-      matched_name: found.matched.name,
-      rank: found.matched.rank,
-      blog: found.matched.blog,
-      visit: found.matched.visit,
-      collected_at: found.collected_at,
+      matched_name: matched.name,
+      rank: found?.matched?.rank ?? null,
+      blog: found?.matched?.blog ?? 0,
+      visit: found?.matched?.visit ?? 0,
+      collected_at: found?.collected_at ?? null,
       history,
     })
   } catch (e: any) {
