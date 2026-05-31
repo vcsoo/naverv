@@ -1,4 +1,4 @@
-import { parseStreamingState, parseDetailReviewCounts } from '../../../src/shared/naver'
+import { parseStreamingState } from '../../../src/shared/naver'
 
 export const runtime = 'edge'
 
@@ -16,63 +16,89 @@ async function fetchText(url: string, referer: string) {
   return { status: r.status, text: await r.text() }
 }
 
-// GET /api/debug-naver?query=검단신도시미용실
-// GET /api/debug-naver?id=PLACE_ID   (place detail page)
+/** 이름 있는 배열(place list 후보)을 재귀 탐색 */
+function findNamedLists(value: unknown, depth = 0, path = ''): string[] {
+  if (depth > 8) return []
+  const found: string[] = []
+  if (Array.isArray(value) && value.length > 0) {
+    const first = (value as any[])[0]
+    if (first && typeof first === 'object' && (first.name || first.placeName)) {
+      found.push(`PATH: ${path} → len=${value.length}, first_keys=[${Object.keys(first).slice(0, 12).join(',')}]`)
+    }
+    for (const item of (value as any[]).slice(0, 2)) {
+      found.push(...findNamedLists(item, depth + 1, `${path}[]`))
+    }
+  } else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      found.push(...findNamedLists(v, depth + 1, path ? `${path}.${k}` : k))
+    }
+  }
+  return found
+}
+
+/** 블록 구조 요약 */
+function summarizeBlock(block: unknown, depth = 0): unknown {
+  if (depth > 3) return '...'
+  if (Array.isArray(block)) {
+    return { _array: true, length: block.length, first: summarizeBlock((block as any[])[0], depth + 1) }
+  }
+  if (block && typeof block === 'object') {
+    const obj: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(block as Record<string, unknown>)) {
+      if (Array.isArray(v)) obj[k] = `Array(${(v as any[]).length})`
+      else if (v && typeof v === 'object') obj[k] = summarizeBlock(v, depth + 1)
+      else obj[k] = v
+    }
+    return obj
+  }
+  return block
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('query') || ''
     const placeId = searchParams.get('id') || ''
 
-    // ── 1. 검색 결과 진단 ──────────────────────────────────────
+    // ── 검색결과 진단 ─────────────────────────────────────
     if (query) {
       const { status, text } = await fetchText(
         `https://m.map.naver.com/search?query=${encodeURIComponent(query)}`,
         'https://m.map.naver.com/'
       )
-      const blocks = parseStreamingState(text)
-      // 첫 번째 아이템의 모든 필드 반환
-      const firstBlock: any = (blocks as any[]).find((b: any) => Array.isArray(b?.items) && b.items.length > 0)
-      const firstItem = firstBlock?.items?.[0] ?? null
+      const blocks = parseStreamingState(text) as any[]
 
       return Response.json({
-        mode: 'search',
         httpStatus: status,
         htmlLength: text.length,
         hasCaptcha: text.includes('ncaptcha'),
-        hasStreamingState: text.includes('window.__RQ_STREAMING_STATE__'),
-        blocksFound: (blocks as any[]).length,
-        firstItemKeys: firstItem ? Object.keys(firstItem) : null,
-        firstItem,  // 전체 필드 확인용
+        blocksFound: blocks.length,
+        // 각 블록의 구조 요약
+        blockSummaries: blocks.map((b, i) => ({ index: i, summary: summarizeBlock(b) })),
+        // place list 후보 경로 탐색
+        namedListPaths: findNamedLists(blocks),
       })
     }
 
-    // ── 2. 플레이스 상세 페이지 진단 ──────────────────────────
+    // ── 상세페이지 진단 ───────────────────────────────────
     if (placeId) {
       const { status, text } = await fetchText(
         `https://m.place.naver.com/place/${placeId}/home`,
         'https://m.place.naver.com/'
       )
-      const parsed = parseDetailReviewCounts(text)
-
-      // 리뷰 관련 패턴 수동 탐색
       const reviewHints: string[] = []
       const patterns = [
-        /방문자\s*리뷰.{0,30}/g,
-        /블로그\s*리뷰.{0,30}/g,
+        /방문자\s*리뷰.{0,40}/g,
+        /블로그\s*리뷰.{0,40}/g,
         /"(?:visitor|blog|review|place)[A-Za-z]*"\s*:\s*\d+/gi,
-        /content="[^"]*(?:리뷰|review)[^"]{0,100}"/gi,
+        /content="[^"]*(?:리뷰|review)[^"]{0,80}"/gi,
       ]
       for (const p of patterns) {
-        const matches = [...text.matchAll(p)].map(m => m[0]).slice(0, 5)
-        reviewHints.push(...matches)
+        for (const m of text.matchAll(p)) reviewHints.push(m[0])
       }
-
       return Response.json({
-        mode: 'detail',
         httpStatus: status,
         htmlLength: text.length,
-        parsedResult: parsed,
         reviewHints: [...new Set(reviewHints)].slice(0, 30),
       })
     }

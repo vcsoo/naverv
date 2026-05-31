@@ -127,32 +127,49 @@ export function parseDetailReviewCounts(html: string): { blog: number | null; vi
   const text = decodeHtml(html)
   const result: { blog: number | null; visit: number | null } = { blog: null, visit: null }
 
-  // og:description 등 메타 태그 — 네이버는 "방문자 리뷰"처럼 공백을 넣기도 하므로 \s* 허용
-  const meta = text.match(/content="([^"]*방문자\s*리뷰[^"]*)"/)
-  if (meta) {
-    const desc = meta[1]
-    const visit = desc.match(/방문자\s*리뷰\s*([\d,]+)/)
-    const blog = desc.match(/블로그\s*리뷰\s*([\d,]+)/)
-    if (visit) result.visit = toInt(visit[1])
-    if (blog) result.blog = toInt(blog[1])
-  }
-
-  // 본문/임베디드 JSON 폴백 (페이지 어디서든 탐색)
+  // ── 1순위: 네이버 snake_case JSON 필드 (최신 포맷)
+  // "visitor_review_count": "방문자 리뷰 1,234건" 또는 "visitor_review_count": 1234
   if (result.visit === null) {
-    const visit =
-      text.match(/방문자\s*리뷰\s*([\d,]+)/) ||
-      text.match(/"visitorReviewsTotal"\s*:\s*(\d+)/) ||
-      text.match(/"visitorReviewCount"\s*:\s*(\d+)/)
-    if (visit) result.visit = toInt(visit[1])
+    const m = text.match(/"visitor_review_count"\s*:\s*"[^"]*?([\d,]+)/) ||
+              text.match(/"visitor_review_count"\s*:\s*(\d+)/)
+    if (m) result.visit = toInt(m[1])
   }
   if (result.blog === null) {
-    const blog =
-      text.match(/블로그\s*리뷰\s*([\d,]+)/) ||
-      text.match(/"blogCafeReviewCount"\s*:\s*(\d+)/) ||
-      text.match(/"blogCafeReviewsTotal"\s*:\s*(\d+)/) ||
-      text.match(/"blogReview(?:s)?Total"\s*:\s*(\d+)/) ||
-      text.match(/"blogReview(?:s)?Count"\s*:\s*(\d+)/)
-    if (blog) result.blog = toInt(blog[1])
+    const m = text.match(/"blog_review_count"\s*:\s*"[^"]*?([\d,]+)/) ||
+              text.match(/"blog_review_count"\s*:\s*(\d+)/)
+    if (m) result.blog = toInt(m[1])
+  }
+
+  // ── 2순위: og:description 메타 태그
+  if (result.visit === null || result.blog === null) {
+    const meta = text.match(/content="([^"]*방문자\s*리뷰[^"]*)"/)
+    if (meta) {
+      const desc = meta[1]
+      if (result.visit === null) {
+        const m = desc.match(/방문자\s*리뷰\s*([\d,]+)/)
+        if (m) result.visit = toInt(m[1])
+      }
+      if (result.blog === null) {
+        const m = desc.match(/블로그\s*리뷰\s*([\d,]+)/)
+        if (m) result.blog = toInt(m[1])
+      }
+    }
+  }
+
+  // ── 3순위: 기타 camelCase/텍스트 폴백
+  if (result.visit === null) {
+    const m = text.match(/방문자\s*리뷰\s*([\d,]+)/) ||
+              text.match(/"visitorReviewsTotal"\s*:\s*(\d+)/) ||
+              text.match(/"visitorReviewCount"\s*:\s*(\d+)/)
+    if (m) result.visit = toInt(m[1])
+  }
+  if (result.blog === null) {
+    const m = text.match(/블로그\s*리뷰\s*([\d,]+)/) ||
+              text.match(/"blogCafeReviewCount"\s*:\s*(\d+)/) ||
+              text.match(/"blogCafeReviewsTotal"\s*:\s*(\d+)/) ||
+              text.match(/"blogReview(?:s)?Total"\s*:\s*(\d+)/) ||
+              text.match(/"blogReview(?:s)?Count"\s*:\s*(\d+)/)
+    if (m) result.blog = toInt(m[1])
   }
   return result
 }
