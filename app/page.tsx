@@ -38,6 +38,7 @@ export default function Home() {
   const [dayFilter, setDayFilter] = useState<7 | 14 | 30>(7)
   const [cardDate, setCardDate] = useState<string>('')
   const [registering, setRegistering] = useState<string | null>(null)
+  const [recollecting, setRecollecting] = useState(false)
   // 모바일 기본 카드, 데스크톱은 effect에서 표로 전환 → 초기 렌더에서 table 안 그림
   const [viewMode, setViewMode] = useState<'table' | 'card'>('card')
 
@@ -104,6 +105,19 @@ export default function Home() {
       setRows(prev => prev.map(r => r.key === row.key ? row : r))
     }
     calcDates(done)
+  }
+
+  async function recollectAll() {
+    if (rows.length === 0) { alert('등록된 항목이 없습니다.'); return }
+    if (!confirm('등록된 모든 키워드의 오늘 데이터를 새로 수집합니다.\n30초~수 분 소요될 수 있습니다. 계속하시겠습니까?')) return
+    setRecollecting(true)
+    try {
+      const r = await fetch('/api/cron', { method: 'POST' })
+      const data = await r.json() as any
+      if (!r.ok) { alert(data?.error || '재수집 실패'); return }
+      await loadDashboard()
+    } catch { alert('재수집 중 오류가 발생했습니다.') }
+    finally { setRecollecting(false) }
   }
 
   async function search() {
@@ -677,7 +691,10 @@ export default function Home() {
                   ))}
                 </>
               )}
-              <button className="btn-sm" onClick={loadDashboard} title="새로고침">↻</button>
+              <button className="btn-sm" onClick={recollectAll} disabled={recollecting} title="오늘 데이터 강제 재수집">
+                {recollecting ? <><span className="srch-spin" style={{verticalAlign:'middle',marginRight:3}}/>수집중</> : '재수집'}
+              </button>
+              <button className="btn-sm" onClick={loadDashboard} disabled={recollecting} title="화면 새로고침">↻</button>
             </div>
           </div>
 
