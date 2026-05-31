@@ -62,7 +62,7 @@ function extractJsonAt(text: string, start: number): { value: unknown; end: numb
   return null
 }
 
-function parseStreamingState(html: string): unknown[] {
+export function parseStreamingState(html: string): unknown[] {
   const marker = 'window.__RQ_STREAMING_STATE__.push('
   const out: unknown[] = []
   let pos = 0
