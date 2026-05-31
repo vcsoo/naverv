@@ -246,15 +246,17 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 최근 7일 미니 순위 (선택 날짜 하이라이트) */}
+            {/* 최근 7일 미니 순위 (오늘이 맨 왼쪽 · 선택 날짜 하이라이트) */}
             {last7.length > 1 && (
               <div className="crd-hist">
                 <div className="crd-hist-inner">
-                  {last7.map((hh, i) => {
+                  {[...last7].reverse().map((hh) => {
                     const dt = new Date(hh.date + 'T00:00:00')
                     const mm = String(dt.getMonth() + 1).padStart(2, '0')
                     const dd = String(dt.getDate()).padStart(2, '0')
-                    const prevH = i > 0 ? last7[i - 1] : null
+                    // 전일 대비 변동은 시간순(과거) 이웃 기준으로 계산
+                    const chronoIdx = last7.findIndex(x => x.date === hh.date)
+                    const prevH = chronoIdx > 0 ? last7[chronoIdx - 1] : null
                     const rd = prevH ? prevH.rank - hh.rank : null
                     const isSel = hh.date === selDate
                     return (

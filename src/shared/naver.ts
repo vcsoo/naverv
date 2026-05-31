@@ -105,8 +105,8 @@ function parsePlace(item: any, fallbackRank: number): NaverPlace | null {
     name,
     address: String(item.roadAddress || item.address || ''),
     category,
-    blog: toInt(item.reviewCount || item.blogReviewCount),
-    visit: toInt(item.placeReviewCount || item.visitorReviewCount),
+    blog: toInt(item.reviewCount ?? item.blogReviewCount ?? item.blogCafeReviewCount),
+    visit: toInt(item.placeReviewCount ?? item.visitorReviewCount ?? item.visitorReviewsTotal),
   }
 }
 
@@ -127,23 +127,29 @@ export function parseDetailReviewCounts(html: string): { blog: number | null; vi
   const text = decodeHtml(html)
   const result: { blog: number | null; visit: number | null } = { blog: null, visit: null }
 
-  const meta = text.match(/content="([^"]*방문자리뷰[^"]*)"/)
+  // og:description 등 메타 태그 — 네이버는 "방문자 리뷰"처럼 공백을 넣기도 하므로 \s* 허용
+  const meta = text.match(/content="([^"]*방문자\s*리뷰[^"]*)"/)
   if (meta) {
     const desc = meta[1]
-    const visit = desc.match(/방문자리뷰\s*([\d,]+)/)
-    const blog = desc.match(/블로그\s*리뷰\s*([\d,]+)/) || desc.match(/블로그리뷰\s*([\d,]+)/)
+    const visit = desc.match(/방문자\s*리뷰\s*([\d,]+)/)
+    const blog = desc.match(/블로그\s*리뷰\s*([\d,]+)/)
     if (visit) result.visit = toInt(visit[1])
     if (blog) result.blog = toInt(blog[1])
   }
 
+  // 본문/임베디드 JSON 폴백 (페이지 어디서든 탐색)
   if (result.visit === null) {
-    const visit = text.match(/"visitorReviewsTotal"\s*:\s*(\d+)/)
+    const visit =
+      text.match(/방문자\s*리뷰\s*([\d,]+)/) ||
+      text.match(/"visitorReviewsTotal"\s*:\s*(\d+)/) ||
+      text.match(/"visitorReviewCount"\s*:\s*(\d+)/)
     if (visit) result.visit = toInt(visit[1])
   }
   if (result.blog === null) {
     const blog =
       text.match(/블로그\s*리뷰\s*([\d,]+)/) ||
-      text.match(/블로그리뷰\s*([\d,]+)/) ||
+      text.match(/"blogCafeReviewCount"\s*:\s*(\d+)/) ||
+      text.match(/"blogCafeReviewsTotal"\s*:\s*(\d+)/) ||
       text.match(/"blogReview(?:s)?Total"\s*:\s*(\d+)/) ||
       text.match(/"blogReview(?:s)?Count"\s*:\s*(\d+)/)
     if (blog) result.blog = toInt(blog[1])
