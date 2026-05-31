@@ -39,6 +39,7 @@ export default function Home() {
   const [cardDate, setCardDate] = useState<string>('')
   const [registering, setRegistering] = useState<string | null>(null)
   const [recollecting, setRecollecting] = useState(false)
+  const [username, setUsername] = useState<string>('')
   // 모바일 기본 카드, 데스크톱은 effect에서 표로 전환 → 초기 렌더에서 table 안 그림
   const [viewMode, setViewMode] = useState<'table' | 'card'>('card')
 
@@ -46,6 +47,9 @@ export default function Home() {
 
   useEffect(() => { loadDashboard() }, [])
   useEffect(() => { if (window.innerWidth >= 700) setViewMode('table') }, [])
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => { if (d?.user) setUsername(d.user.username) })
+  }, [])
 
   const mkKey = (sq: string, pi: string) => `${sq}||${pi}`
   const rCls  = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
@@ -76,8 +80,14 @@ export default function Home() {
     } catch { return null }
   }
 
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.href = '/login'
+  }
+
   async function loadDashboard() {
     const r = await fetch('/api/targets')
+    if (r.status === 401) { window.location.href = '/login'; return }
     const tList: any[] = await r.json()
     if (!Array.isArray(tList) || !tList.length) { setRows([]); setDates([]); return }
 
@@ -534,8 +544,18 @@ export default function Home() {
       `}</style>
 
       <header className="hdr">
-        <h1>🏆 네이버 플레이스 순위 추적기</h1>
-        <p>매일 11:30 자동수집 · 최대 10개 등록 · 삭제 전까지 유지</p>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <h1>🏆 네이버 플레이스 순위 추적기</h1>
+            <p>매일 11:30 자동수집 · 최대 10개 등록 · 삭제 전까지 유지</p>
+          </div>
+          {username && (
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginTop:'4px',flexShrink:0}}>
+              <span style={{fontSize:'0.8rem',opacity:0.8}}>{username}</span>
+              <button onClick={logout} style={{fontSize:'0.75rem',padding:'3px 10px',border:'1px solid rgba(255,255,255,0.4)',borderRadius:'6px',background:'transparent',color:'inherit',cursor:'pointer'}}>로그아웃</button>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="wrap">

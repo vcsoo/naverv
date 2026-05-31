@@ -104,11 +104,11 @@ export async function getLatestRankingList(db: D1Database, query: string, limit 
   return { collected_at: collectedAt, list: results }
 }
 
-export async function upsertTarget(db: D1Database, query: string, inputName: string, matchedName: string | null) {
+export async function upsertTarget(db: D1Database, query: string, inputName: string, matchedName: string | null, userId: number) {
   const now = kstNowString()
   const existing = await db
-    .prepare('SELECT id FROM targets WHERE search_query = ? AND place_name_input = ? LIMIT 1')
-    .bind(query, inputName)
+    .prepare('SELECT id FROM targets WHERE search_query = ? AND place_name_input = ? AND user_id = ? LIMIT 1')
+    .bind(query, inputName, userId)
     .first<{ id: number }>()
 
   if (existing) {
@@ -119,10 +119,10 @@ export async function upsertTarget(db: D1Database, query: string, inputName: str
   } else {
     await db
       .prepare(
-        `INSERT INTO targets (search_query, place_name_input, matched_name, first_added_at, last_searched_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO targets (search_query, place_name_input, matched_name, first_added_at, last_searched_at, user_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .bind(query, inputName, matchedName, now, now)
+      .bind(query, inputName, matchedName, now, now, userId)
       .run()
   }
 }
@@ -172,6 +172,19 @@ export async function listActiveTargets(db: D1Database) {
        FROM targets
        ORDER BY last_searched_at DESC`,
     )
+    .all<any>()
+  return results
+}
+
+export async function listUserTargets(db: D1Database, userId: number) {
+  const { results } = await db
+    .prepare(
+      `SELECT id, search_query, place_name_input, matched_name, first_added_at, last_searched_at
+       FROM targets
+       WHERE user_id = ?
+       ORDER BY last_searched_at DESC`,
+    )
+    .bind(userId)
     .all<any>()
   return results
 }
