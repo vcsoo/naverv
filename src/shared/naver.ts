@@ -80,7 +80,7 @@ export function parseStreamingState(html: string): unknown[] {
   return out
 }
 
-function findItemBlocks(value: unknown): any[] {
+export function findItemBlocks(value: unknown): any[] {
   const found: any[] = []
   if (Array.isArray(value)) {
     for (const item of value) found.push(...findItemBlocks(item))

@@ -1,4 +1,4 @@
-import { parseStreamingState, findItemBlocks } from '../../../src/shared/naver'
+import { parseStreamingState, findItemBlocks, parseDetailReviewCounts } from '../../../src/shared/naver'
 
 export const runtime = 'edge'
 
@@ -88,10 +88,10 @@ export async function GET(request: Request) {
       return Response.json({
         httpStatus: status,
         htmlLength: text.length,
+        // ★ 실제 파싱 결과
+        parsedReviews: parseDetailReviewCounts(text),
         streamingBlocksFound: streaming.length,
-        // streaming state 내 숫자 review 필드
         numericReviewFieldsInStreaming: numericFields.slice(0, 30),
-        // 전체 streaming 구조 요약 (shallow)
         streamingKeys: streaming.map((b: any, i: number) => ({
           index: i,
           type: Array.isArray(b) ? 'array' : typeof b,
