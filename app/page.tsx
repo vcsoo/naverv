@@ -40,6 +40,11 @@ export default function Home() {
   const [registering, setRegistering] = useState<string | null>(null)
   const [recollecting, setRecollecting] = useState(false)
   const [username, setUsername] = useState<string>('')
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [newUsername, setNewUsername] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [addingUser, setAddingUser] = useState(false)
+  const [addUserMsg, setAddUserMsg] = useState<{ok: boolean; text: string} | null>(null)
   // 모바일 기본 카드, 데스크톱은 effect에서 표로 전환 → 초기 렌더에서 table 안 그림
   const [viewMode, setViewMode] = useState<'table' | 'card'>('card')
 
@@ -83,6 +88,31 @@ export default function Home() {
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
+  }
+
+  async function createUser(e: React.FormEvent) {
+    e.preventDefault()
+    const u = newUsername.trim(); const p = newPassword.trim()
+    if (!u || !p) { setAddUserMsg({ ok: false, text: '아이디와 비밀번호를 모두 입력하세요' }); return }
+    setAddingUser(true); setAddUserMsg(null)
+    try {
+      const res = await fetch('/api/auth/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAddUserMsg({ ok: true, text: `계정 "${u}" 생성 완료` })
+        setNewUsername(''); setNewPassword('')
+      } else {
+        setAddUserMsg({ ok: false, text: data.error || '생성 실패' })
+      }
+    } catch {
+      setAddUserMsg({ ok: false, text: '네트워크 오류' })
+    } finally {
+      setAddingUser(false)
+    }
   }
 
   async function loadDashboard() {
@@ -815,6 +845,43 @@ export default function Home() {
             </>
           )}
         </div>
+
+        {/* 계정 관리 — muamong 전용 */}
+        {username === 'muamong' && (
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showAddUser ? 14 : 0 }}>
+              👤 계정 관리
+              <button className="btn-sm" onClick={() => { setShowAddUser(v => !v); setAddUserMsg(null) }}
+                style={{ fontSize: '.75rem' }}>
+                {showAddUser ? '닫기' : '+ 계정 추가'}
+              </button>
+            </div>
+            {showAddUser && (
+              <form onSubmit={createUser} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="srow" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                  <div className="fg">
+                    <label>아이디</label>
+                    <input value={newUsername} onChange={e => setNewUsername(e.target.value)}
+                      placeholder="새 아이디" autoComplete="off" disabled={addingUser} />
+                  </div>
+                  <div className="fg">
+                    <label>비밀번호</label>
+                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                      placeholder="비밀번호" autoComplete="new-password" disabled={addingUser} />
+                  </div>
+                  <button type="submit" className="btn-search" disabled={addingUser}>
+                    {addingUser ? '생성 중...' : '생성'}
+                  </button>
+                </div>
+                {addUserMsg && (
+                  <div style={{ fontSize: '.8rem', color: addUserMsg.ok ? 'var(--gd)' : 'var(--red)', fontWeight: 600 }}>
+                    {addUserMsg.ok ? '✓ ' : '✕ '}{addUserMsg.text}
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+        )}
 
       </div>
     </>
