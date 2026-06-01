@@ -39,6 +39,12 @@ export default function Home() {
   const [cardDate, setCardDate] = useState<string>('')
   const [registering, setRegistering] = useState<string | null>(null)
   const [recollecting, setRecollecting] = useState(false)
+  const [username, setUsername] = useState<string>('')
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [newUsername, setNewUsername] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [addingUser, setAddingUser] = useState(false)
+  const [addUserMsg, setAddUserMsg] = useState<{ok: boolean; text: string} | null>(null)
   // 모바일 기본 카드, 데스크톱은 effect에서 표로 전환 → 초기 렌더에서 table 안 그림
   const [viewMode, setViewMode] = useState<'table' | 'card'>('card')
 
@@ -46,6 +52,9 @@ export default function Home() {
 
   useEffect(() => { loadDashboard() }, [])
   useEffect(() => { if (window.innerWidth >= 700) setViewMode('table') }, [])
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(d => { if (d?.user) setUsername(d.user.username) })
+  }, [])
 
   const mkKey = (sq: string, pi: string) => `${sq}||${pi}`
   const rCls  = (r: number) => r === 1 ? 'r1' : r <= 3 ? 'r3' : r <= 10 ? 'r10' : 'rn'
@@ -76,8 +85,39 @@ export default function Home() {
     } catch { return null }
   }
 
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.href = '/login'
+  }
+
+  async function createUser(e: React.FormEvent) {
+    e.preventDefault()
+    const u = newUsername.trim(); const p = newPassword.trim()
+    if (!u || !p) { setAddUserMsg({ ok: false, text: '아이디와 비밀번호를 모두 입력하세요' }); return }
+    setAddingUser(true); setAddUserMsg(null)
+    try {
+      const res = await fetch('/api/auth/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAddUserMsg({ ok: true, text: `계정 "${u}" 생성 완료` })
+        setNewUsername(''); setNewPassword('')
+      } else {
+        setAddUserMsg({ ok: false, text: data.error || '생성 실패' })
+      }
+    } catch {
+      setAddUserMsg({ ok: false, text: '네트워크 오류' })
+    } finally {
+      setAddingUser(false)
+    }
+  }
+
   async function loadDashboard() {
     const r = await fetch('/api/targets')
+    if (r.status === 401) { window.location.href = '/login'; return }
     const tList: any[] = await r.json()
     if (!Array.isArray(tList) || !tList.length) { setRows([]); setDates([]); return }
 
@@ -112,12 +152,19 @@ export default function Home() {
     if (!confirm('등록된 모든 키워드의 오늘 데이터를 새로 수집합니다.\n30초~수 분 소요될 수 있습니다. 계속하시겠습니까?')) return
     setRecollecting(true)
     try {
-      const r = await fetch('/api/cron', { method: 'POST' })
-      const data = await r.json() as any
-      if (!r.ok) { alert(data?.error || '재수집 실패'); return }
+      const r = await fetch('/api/recollect', { method: 'POST' })
+      let data: any = null
+      try { data = await r.json() } catch { /* non-JSON response */ }
+      if (!r.ok) {
+        alert(`재수집 실패 (${r.status})\n${data?.error || r.statusText || '알 수 없는 오류'}`)
+        return
+      }
       await loadDashboard()
-    } catch { alert('재수집 중 오류가 발생했습니다.') }
-    finally { setRecollecting(false) }
+    } catch (e: any) {
+      alert(`재수집 중 오류\n${e?.message || String(e)}`)
+    } finally {
+      setRecollecting(false)
+    }
   }
 
   async function search() {
@@ -527,8 +574,18 @@ export default function Home() {
       `}</style>
 
       <header className="hdr">
-        <h1>🏆 네이버 플레이스 순위 추적기</h1>
-        <p>매일 11:30 자동수집 · 최대 10개 등록 · 삭제 전까지 유지</p>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <h1>🏆 네이버 플레이스 순위 추적기</h1>
+            <p>매일 11:30 자동수집 · 최대 10개 등록 · 삭제 전까지 유지</p>
+          </div>
+          {username && (
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginTop:'4px',flexShrink:0}}>
+              <span style={{fontSize:'0.8rem',opacity:0.8}}>{username}</span>
+              <button onClick={logout} style={{fontSize:'0.75rem',padding:'3px 10px',border:'1px solid rgba(255,255,255,0.4)',borderRadius:'6px',background:'transparent',color:'inherit',cursor:'pointer'}}>로그아웃</button>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="wrap">
@@ -788,6 +845,43 @@ export default function Home() {
             </>
           )}
         </div>
+
+        {/* 계정 관리 — muamong 전용 */}
+        {username === 'muamong' && (
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showAddUser ? 14 : 0 }}>
+              👤 계정 관리
+              <button className="btn-sm" onClick={() => { setShowAddUser(v => !v); setAddUserMsg(null) }}
+                style={{ fontSize: '.75rem' }}>
+                {showAddUser ? '닫기' : '+ 계정 추가'}
+              </button>
+            </div>
+            {showAddUser && (
+              <form onSubmit={createUser} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="srow" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+                  <div className="fg">
+                    <label>아이디</label>
+                    <input value={newUsername} onChange={e => setNewUsername(e.target.value)}
+                      placeholder="새 아이디" autoComplete="off" disabled={addingUser} />
+                  </div>
+                  <div className="fg">
+                    <label>비밀번호</label>
+                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                      placeholder="비밀번호" autoComplete="new-password" disabled={addingUser} />
+                  </div>
+                  <button type="submit" className="btn-search" disabled={addingUser}>
+                    {addingUser ? '생성 중...' : '생성'}
+                  </button>
+                </div>
+                {addUserMsg && (
+                  <div style={{ fontSize: '.8rem', color: addUserMsg.ok ? 'var(--gd)' : 'var(--red)', fontWeight: 600 }}>
+                    {addUserMsg.ok ? '✓ ' : '✕ '}{addUserMsg.text}
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+        )}
 
       </div>
     </>
