@@ -358,11 +358,26 @@ export default function Home() {
         :root{--g:#03c75a;--gd:#00a045;--gb:#e8faf1;--blue:#1967d2;--red:#e8192c;--org:#ff9500;--gold:#e6aa00;--bg:#f0f4f8;--surf:#fff;--bdr:#e2e8f0;--txt:#1a2332;--mut:#64748b;--sub:#94a3b8;--r:12px}
         *{box-sizing:border-box;margin:0;padding:0}
         html,body{overflow-x:hidden;max-width:100%}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:14px;display:flex;flex-direction:column;min-height:100vh}
 
-        .hdr{background:linear-gradient(135deg,#03c75a,#00b44a 45%,#0597d8);padding:14px 24px;position:sticky;top:0;z-index:200}
-        .hdr h1{color:#fff;font-size:1.05rem;font-weight:700}
-        .hdr p{color:rgba(255,255,255,.75);font-size:.7rem;margin-top:2px}
+        .hdr{background:#fff;border-bottom:1px solid var(--bdr);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:200}
+        .hdr-left{display:flex;align-items:center;gap:12px;min-width:0}
+        .hdr .wordmark{height:22px;width:auto;flex-shrink:0;display:block}
+        .hdr-sub{font-size:.7rem;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .hdr-user{font-size:.78rem;color:var(--mut);font-weight:600;flex-shrink:0}
+
+        .site-footer{background:#111;padding:20px 24px;margin-top:auto}
+        .footer-inner{max-width:1400px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+        .footer-logo{height:38px;width:auto}
+        .footer-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+        .footer-family{display:flex;align-items:center;gap:8px}
+        .family-label{font-size:.7rem;color:#555;font-weight:600}
+        .family-sep{color:#444;font-size:.7rem}
+        .family-link{font-size:.7rem;color:#888;text-decoration:none;transition:.15s}
+        .family-link:hover{color:#ccc}
+        .copyright{font-size:.7rem;color:#555;line-height:1}
+        .footer-logout{margin-top:8px;background:none;border:1px solid #444;border-radius:4px;color:#888;font-size:.7rem;font-family:inherit;padding:4px 12px;cursor:pointer;transition:.15s}
+        .footer-logout:hover{color:#ccc;border-color:#666}
 
         .wrap{max-width:1400px;margin:0 auto;padding:18px 16px;display:flex;flex-direction:column;gap:16px;overflow-x:hidden}
         .wrap>*{min-width:0}
@@ -523,8 +538,13 @@ export default function Home() {
           /* 레이아웃 */
           .wrap{padding:10px 10px;gap:10px}
           .card{padding:14px 12px}
-          .hdr{padding:12px 16px}
-          .hdr h1{font-size:1rem}
+          .hdr{padding:0 14px;height:50px}
+          .hdr .wordmark{height:18px}
+          .hdr-sub{display:none}
+          .site-footer{padding:16px 14px}
+          .footer-inner{flex-direction:column;align-items:flex-start;gap:12px}
+          .footer-right{align-items:flex-start}
+          .footer-logo{height:30px}
 
           /* 검색폼 */
           .srow{grid-template-columns:1fr;gap:8px}
@@ -574,18 +594,11 @@ export default function Home() {
       `}</style>
 
       <header className="hdr">
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-          <div>
-            <h1>🏆 네이버 플레이스 순위 추적기</h1>
-            <p>매일 11:30 자동수집 · 최대 10개 등록 · 삭제 전까지 유지</p>
-          </div>
-          {username && (
-            <div style={{display:'flex',alignItems:'center',gap:'8px',marginTop:'4px',flexShrink:0}}>
-              <span style={{fontSize:'0.8rem',opacity:0.8}}>{username}</span>
-              <button onClick={logout} style={{fontSize:'0.75rem',padding:'3px 10px',border:'1px solid rgba(255,255,255,0.4)',borderRadius:'6px',background:'transparent',color:'inherit',cursor:'pointer'}}>로그아웃</button>
-            </div>
-          )}
+        <div className="hdr-left">
+          <img className="wordmark" src="/logo/wordmark.png" alt="MUAMONG" />
+          <span className="hdr-sub">네이버 플레이스 순위 추적 · 매일 09:00 / 16:00 자동수집</span>
         </div>
+        {username && <span className="hdr-user">{username}</span>}
       </header>
 
       <div className="wrap">
@@ -884,6 +897,21 @@ export default function Home() {
         )}
 
       </div>
+
+      <footer className="site-footer">
+        <div className="footer-inner">
+          <img className="footer-logo" src="/logo/footer-w.png" alt="무아몽헤어" />
+          <div className="footer-right">
+            <div className="footer-family">
+              <span className="family-label">Related Services</span>
+              <span className="family-sep">|</span>
+              <a className="family-link" href="https://muamong.pages.dev/" target="_blank" rel="noopener">무아몽 급여관리</a>
+            </div>
+            <span className="copyright">© 2026 Muamong Hair. All Rights Reserved.</span>
+            {username && <button className="footer-logout" onClick={logout}>로그아웃</button>}
+          </div>
+        </div>
+      </footer>
     </>
   )
 }

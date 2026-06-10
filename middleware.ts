@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|login).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo/|login).*)'],
 }
 
 export async function middleware(request: NextRequest) {
