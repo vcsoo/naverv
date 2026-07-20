@@ -1,4 +1,4 @@
-import { collectNaverPlaces, enrichPlaces, kstDateString, kstNowString, matchPlace, normalizeName, type NaverPlace } from './naver'
+import { collectNaverPlaces, enrichOne, enrichPlaces, kstDateString, kstNowString, matchPlace, normalizeName, type NaverPlace } from './naver'
 
 export type Env = {
   DB: D1Database
@@ -187,6 +187,21 @@ export async function listUserTargets(db: D1Database, userId: number) {
     .bind(userId)
     .all<any>()
   return results
+}
+
+export async function enrichTargetReviews(db: D1Database, query: string, placeName: string): Promise<void> {
+  const found = await findPlaceInLatest(db, query, placeName)
+  if (!found?.matched) return
+  const enriched = await enrichOne(found.matched)
+  if (enriched.blog === 0 && enriched.visit === 0) return
+  const today = kstDateString()
+  await db
+    .prepare(
+      `UPDATE rankings SET blog_review_count = ?, visitor_review_count = ?, total_review_count = ?
+       WHERE search_query = ? AND place_id = ? AND substr(collected_at, 1, 10) = ?`,
+    )
+    .bind(enriched.blog, enriched.visit, enriched.blog + enriched.visit, query, enriched.place_id, today)
+    .run()
 }
 
 export async function findPlaceInHistory(db: D1Database, query: string, placeName: string): Promise<NaverPlace | null> {

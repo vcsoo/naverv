@@ -174,7 +174,7 @@ export function parseDetailReviewCounts(html: string): { blog: number | null; vi
   return result
 }
 
-async function enrichOne(place: NaverPlace): Promise<NaverPlace> {
+export async function enrichOne(place: NaverPlace): Promise<NaverPlace> {
   try {
     const html = await fetchText(`https://m.place.naver.com/place/${place.place_id}/home`, 'https://m.place.naver.com/')
     const detail = parseDetailReviewCounts(html)
