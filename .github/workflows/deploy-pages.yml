@@ -1,10 +1,8 @@
 name: Deploy to Cloudflare Pages
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'worker-cron/**'
+  workflow_dispatch:
+    # Cloudflare Pages 직접 연동으로 전환 — 자동 배포 비활성화
 
 jobs:
   deploy:
