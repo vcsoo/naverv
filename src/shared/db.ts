@@ -25,14 +25,12 @@ export async function collectAndStore(db: D1Database, query: string, limit = 100
     .bind(query)
     .all<{ matched_name: string | null; place_name_input: string }>()
 
-  const targetPlaceIds: string[] = []
+  const enrichIds = new Set<string>(rawPlaces.slice(0, 10).map(p => p.place_id))
   for (const t of targetRows) {
     const matched = matchPlace(rawPlaces, t.matched_name || t.place_name_input)
-    if (matched && !targetPlaceIds.includes(matched.place_id)) {
-      targetPlaceIds.push(matched.place_id)
-    }
+    if (matched) enrichIds.add(matched.place_id)
   }
-  const places = await enrichPlaces(rawPlaces, targetPlaceIds)
+  const places = await enrichPlaces(rawPlaces, [...enrichIds])
 
   const collectedAt = kstNowString()
   const date = collectedAt.slice(0, 10)
